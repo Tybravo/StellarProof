@@ -92,6 +92,7 @@ Developers can easily integrate StellarProof:
 ```text
 StellarProof/
 ├── README.md
+├── Dockerfile
 ├── pnpm-workspace.yaml
 ├── package.json
 ├── .env.example
@@ -122,9 +123,14 @@ StellarProof/
 │   └── verification/        # Verification orchestration
 │
 ├── contracts/
-│   ├── oracle/              # Verification request contract
-│   ├── provenance/          # Certificate minting contract
-│   └── registry/            # Trusted TEE registry
+│   └── stellarproof/
+│       ├── src/
+│       │   ├── lib.rs
+│       │   └── test.rs
+│       ├── target/
+│       ├── Cargo.lock
+│       ├── Cargo.toml
+│       └── Makefile
 │
 ├── packages/
 │   ├── ui/
