@@ -33,7 +33,7 @@ StellarProof is a monorepo consisting of several key components:
 
 You will need the following installed:
 
-*   **Node.js**: Version 18 or later. [Download](https://nodejs.org/)
+*   **Node.js**: Version 20 or later. [Download](https://nodejs.org/)
 *   **pnpm**: Package manager. [Installation Guide](https://pnpm.io/installation)
 *   **Rust**: Latest stable toolchain. [Installation Guide](https://www.rust-lang.org/tools/install)
 *   **Stellar CLI / Soroban CLI**: For compiling and deploying contracts. [Installation Guide](https://developers.stellar.org/docs/smart-contracts/getting-started/setup)

@@ -244,7 +244,7 @@ Each attestation includes:
 ## ⚡ Getting Started
 
 ### Prerequisites
-*   Node.js 18+
+*   Node.js 20+
 *   Rust (latest stable)
 *   Cargo
 *   Use Stellar CLI for Soroban commands (Recommended)
