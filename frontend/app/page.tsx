@@ -1,36 +1,27 @@
 import Header from "@/components/Header";
+import About from "@/components/About";
+import HeroSection  from "@/components/HeroSection";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-darkblue-dark font-sans">
       <Header />
+     
       <main className="w-full">
         <section
           id="home"
-          className="flex min-h-[80vh] flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8"
+          // className="flex min-h-[80vh] flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8"
           aria-label="Home"
         >
-          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl dark:text-white">
-            StellarProof
+          <HeroSection />
+          {/* <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl dark:text-white">
+            StellarProoffff
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-foreground/80 dark:text-white/80">
             Web3 authenticity and blockchain verification.
-          </p>
+          </p> */}
         </section>
-        <section
-          id="about"
-          className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
-          aria-label="About"
-        >
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-2xl font-semibold text-foreground dark:text-white">
-              About
-            </h2>
-            <p className="mt-4 text-foreground/80 dark:text-white/80">
-              About section content.
-            </p>
-          </div>
-        </section>
+        <About />
         <section
           id="creator"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
