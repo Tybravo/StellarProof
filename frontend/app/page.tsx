@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import About from "@/components/About";
 
 export default function Home() {
   return (
@@ -17,20 +18,7 @@ export default function Home() {
             Web3 authenticity and blockchain verification.
           </p>
         </section>
-        <section
-          id="about"
-          className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
-          aria-label="About"
-        >
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-2xl font-semibold text-foreground dark:text-white">
-              About
-            </h2>
-            <p className="mt-4 text-foreground/80 dark:text-white/80">
-              About section content.
-            </p>
-          </div>
-        </section>
+        <About />
         <section
           id="creator"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
