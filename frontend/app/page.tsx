@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import About from "@/components/About";
-import HeroSection  from "@/components/HeroSection";
+import HeroSection from "@/components/HeroSection";
+import Ecosystem from "@/components/Ecosystem";
 
 export default function Home() {
   return (
@@ -10,18 +11,16 @@ export default function Home() {
       <main className="w-full">
         <section
           id="home"
-          // className="flex min-h-[80vh] flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8"
           aria-label="Home"
         >
           <HeroSection />
-          {/* <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl dark:text-white">
-            StellarProoffff
-          </h1>
-          <p className="mt-4 max-w-2xl text-lg text-foreground/80 dark:text-white/80">
-            Web3 authenticity and blockchain verification.
-          </p> */}
         </section>
+        
         <About />
+        
+        {/* Ecosystem Integrations Section */}
+        <Ecosystem />
+        
         <section
           id="creator"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
@@ -36,6 +35,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+        
         <section
           id="developer"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
@@ -50,6 +50,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+        
         <section
           id="assets"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
@@ -64,6 +65,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+        
         <section
           id="use-cases"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
@@ -78,6 +80,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+        
         <section
           id="pricing"
           className="scroll-mt-16 px-4 py-20 sm:px-6 lg:px-8"
