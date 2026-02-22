@@ -48,7 +48,7 @@ export default function Footer() {
                 <span className="text-xl font-bold text-pink-400">Proof</span>
               </div>
             </div>
-            <p className="text-sm leading-relaxed mb-6 max-w-xs text-background/50">
+            <p className="text-sm leading-relaxed mb-6 max-w-xs">
               The Truth Engine for Digital Content and Media Ecosystem. Verifiable digital authenticity powered by Soroban smart contracts.
             </p>
             {/* Social Icons */}
@@ -89,7 +89,7 @@ export default function Footer() {
             <h3 className="font-bold text-white text-sm uppercase tracking-wider mb-6">
               Platform<br />Overview
             </h3>
-            <nav className="flex flex-col space-y-3 text-background/50">
+            <nav className="flex flex-col space-y-3">
               <a href="#" className="block text-sm hover:text-blue-300 transition-colors">
                 What is StellarProof
               </a>
@@ -113,7 +113,7 @@ export default function Footer() {
             <h3 className="font-bold text-white text-sm uppercase tracking-wider mb-6">
               Support Center
             </h3>
-            <nav className="flex flex-col space-y-3 text-background/50">
+            <nav className="flex flex-col space-y-3">
               <a href="#" className="block text-sm hover:text-blue-300 transition-colors">
                 Documentation
               </a>
@@ -134,7 +134,7 @@ export default function Footer() {
             <h3 className="font-bold text-white text-sm uppercase tracking-wider mb-6">
               Resources
             </h3>
-            <nav className="flex flex-col space-y-3 text-background/50">
+            <nav className="flex flex-col space-y-3">
               <a href="#" className="block text-sm hover:text-blue-300 transition-colors">
                 Proof Registry
               </a>
@@ -155,7 +155,7 @@ export default function Footer() {
             <h3 className="font-bold text-white text-sm uppercase tracking-wider mb-6">
               Compliance
             </h3>
-            <nav className="flex flex-col space-y-3 text-background/50">
+            <nav className="flex flex-col space-y-3">
               <a href="#" className="block text-sm hover:text-blue-300 transition-colors">
                 Terms of Use
               </a>
