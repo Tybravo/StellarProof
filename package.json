@@ -12,7 +12,7 @@
   },
   "lint-staged": {
     "frontend/**/*.{ts,tsx}": [
-      "pnpm --filter web exec eslint --fix"
+      "pnpm --filter web exec eslint --fix --cache --cache-location .eslintcache"
     ]
   },
   "keywords": [],

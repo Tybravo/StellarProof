@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "#home", label: "Home" },
@@ -76,7 +77,10 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    const sectionIds = ["#home", "#about", "#creator", "#developer", "#assets", "#use-cases", "#pricing"];
+    const sectionIds = [
+      "#home", "#about", "#creator", "#developer",
+      "#assets", "#use-cases", "#pricing",
+    ];
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -97,43 +101,35 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-white/20 bg-white dark:bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)] transition-colors duration-300">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+
         {/* Logo */}
         <a
           href="#home"
-          onClick={(e) => {
-            e.preventDefault();
-            scrollToSection("#home");
-          }}
-          className="flex shrink-0 items-center gap-2.5 outline-none transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue"
+          onClick={(e) => { e.preventDefault(); scrollToSection("#home"); }}
+          className="flex shrink-0 items-center gap-2.5 outline-none transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue"
         >
           <LogoIcon />
           <span className="text-xl font-semibold tracking-tight">
-            <span className="text-primary-light">Stellar</span>
+            <span className="text-primary">Stellar</span>
             <span className="text-secondary">Proof</span>
           </span>
         </a>
 
         {/* Desktop nav */}
-        <nav
-          className="hidden items-center gap-1 lg:flex"
-          aria-label="Main navigation"
-        >
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
           <ul className="flex items-center gap-1">
             {NAV_LINKS.map((item) =>
               "href" in item ? (
                 <li key={item.href}>
                   <a
                     href={item.href}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      scrollToSection(item.href);
-                    }}
-                    className={`relative rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue ${
+                    onClick={(e) => { e.preventDefault(); scrollToSection(item.href); }}
+                    className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue ${
                       activeSection === item.href
-                        ? "text-white"
-                        : "text-white/80 hover:bg-white/10 hover:text-white"
+                        ? "text-gray-900 dark:text-white"
+                        : "text-gray-600 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                     }`}
                   >
                     {item.label}
@@ -154,7 +150,7 @@ export default function Header() {
                 >
                   <button
                     type="button"
-                    className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue"
+                    className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 dark:text-white/80 transition-colors duration-300 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue"
                     aria-expanded={openDropdown === item.label}
                     aria-haspopup="true"
                     aria-controls={`dropdown-${item.label.toLowerCase()}`}
@@ -162,7 +158,7 @@ export default function Header() {
                   >
                     {item.label}
                     <ChevronDown
-                      className={`h-4 w-4 transition ${openDropdown === item.label ? "rotate-180" : ""}`}
+                      className={`h-4 w-4 transition-transform ${openDropdown === item.label ? "rotate-180" : ""}`}
                       aria-hidden
                     />
                   </button>
@@ -178,7 +174,7 @@ export default function Header() {
                         transition={{ duration: 0.15 }}
                         className="absolute left-0 top-full pt-1"
                       >
-                        <li className="rounded-lg border border-white/10 bg-darkblue/95 shadow-lg backdrop-blur-md">
+                        <li className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue/95 shadow-lg backdrop-blur-md">
                           <ul className="min-w-[160px] py-1">
                             {item.children.map((child) => (
                               <li key={child.href} role="none">
@@ -190,7 +186,7 @@ export default function Header() {
                                     scrollToSection(child.href);
                                     setOpenDropdown(null);
                                   }}
-                                  className="block px-4 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white focus-visible:outline-none"
+                                  className="block px-4 py-2 text-sm text-gray-700 dark:text-white/90 transition-colors duration-300 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white focus-visible:bg-gray-100 dark:focus-visible:bg-white/10 focus-visible:outline-none"
                                 >
                                   {child.label}
                                 </a>
@@ -207,17 +203,20 @@ export default function Header() {
           </ul>
         </nav>
 
-        {/* CTA + Mobile toggle */}
         <div className="flex items-center gap-2">
+
+          <ThemeToggle />
+
           <Link
             href="/creator/upload-content"
-            className="hidden rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-button-glow transition hover:shadow-glow focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue sm:inline-block"
+            className="hidden rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-button-glow transition hover:shadow-glow focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue sm:inline-block"
           >
             Launch App
           </Link>
+
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 dark:text-white transition-colors duration-300 hover:bg-gray-100 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue lg:hidden"
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -239,20 +238,17 @@ export default function Header() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-white/10 bg-darkblue/98 lg:hidden"
+            className="overflow-hidden border-t border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue/98 lg:hidden transition-colors duration-300"
           >
-            <nav className="border-t border-white/10 bg-darkblue px-4 py-4">
+            <nav className="border-t border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue px-4 py-4 transition-colors duration-300">
               <ul className="flex flex-col gap-1">
                 {NAV_LINKS.map((item) =>
                   "href" in item ? (
                     <li key={item.href}>
                       <a
                         href={item.href}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleNavClick(item.href);
-                        }}
-                        className="block rounded-lg px-4 py-3 text-base font-medium text-white/90 touch-manipulation"
+                        onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
+                        className="block rounded-lg px-4 py-3 text-base font-medium text-gray-800 dark:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 touch-manipulation transition-colors duration-300"
                       >
                         {item.label}
                       </a>
@@ -261,18 +257,16 @@ export default function Header() {
                     <li key={item.label}>
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-base font-medium text-white/90 touch-manipulation"
+                        className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-base font-medium text-gray-800 dark:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 touch-manipulation transition-colors duration-300"
                         aria-expanded={mobileDropdown === item.label}
                         aria-controls={`mobile-dropdown-${item.label.toLowerCase()}`}
                         onClick={() =>
-                          setMobileDropdown((d) =>
-                            d === item.label ? null : item.label
-                          )
+                          setMobileDropdown((d) => d === item.label ? null : item.label)
                         }
                       >
                         {item.label}
                         <ChevronDown
-                          className={`h-5 w-5 transition ${mobileDropdown === item.label ? "rotate-180" : ""}`}
+                          className={`h-5 w-5 transition-transform ${mobileDropdown === item.label ? "rotate-180" : ""}`}
                           aria-hidden
                         />
                       </button>
@@ -290,11 +284,8 @@ export default function Header() {
                               <li key={child.href}>
                                 <a
                                   href={child.href}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleNavClick(child.href);
-                                  }}
-                                  className="block rounded-lg py-2.5 pl-2 text-sm text-white/80"
+                                  onClick={(e) => { e.preventDefault(); handleNavClick(child.href); }}
+                                  className="block rounded-lg py-2.5 pl-2 text-sm text-gray-600 dark:text-white/80 hover:text-gray-900 dark:hover:text-white transition-colors duration-300"
                                 >
                                   {child.label}
                                 </a>
@@ -307,10 +298,10 @@ export default function Header() {
                   )
                 )}
               </ul>
-              <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="mt-4 border-t border-gray-200 dark:border-white/10 pt-4">
                 <Link
                   href="/creator/upload-content"
-                  className="flex w-full items-center justify-center rounded-lg bg-primary py-3 text-base font-semibold text-white shadow-button-glow transition hover:shadow-glow focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-darkblue"
+                  className="flex w-full items-center justify-center rounded-lg bg-primary py-3 text-base font-semibold text-white shadow-button-glow transition hover:shadow-glow focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue"
                   onClick={() => setMobileOpen(false)}
                 >
                   Launch App
