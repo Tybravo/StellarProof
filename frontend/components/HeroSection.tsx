@@ -43,8 +43,7 @@ export default function HeroSection() {
     <section className="relative min-h-screen overflow-hidden">
       {/* Dark radial gradient background */}
       {/* <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#1a1f2e_0%,_#0B1120_80%)]" /> */}
-      {/* <div className="absolute inset-0 bg-gradient-to-r from-[#256AF4] via-[##60A5FA] to-[#FF7CE9_30%]" /> */}
-       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_30%,_#eef2ff_20%,_#ffffff_60%)] dark:bg-[radial-gradient(ellipse_at_70%_30%,_#1e2a3a_20%,_#0a0f1a_50%)]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#256AF4] via-[##60A5FA] to-[##FF7CE9]" />
       {/* Glow effects (optional, enhances the gradient) */}
       <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/15 dark:bg-blue-500/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute right-0 bottom-0 translate-x-1/3 translate-y-1/3 w-[500px] h-[500px] bg-purple-500/15 dark:bg-purple-500/20 rounded-full blur-[120px] pointer-events-none" />
@@ -118,7 +117,9 @@ export default function HeroSection() {
               <p className="text-xs font-semibold tracking-wider uppercase text-[#FF7CE9]">
                 Trusted Execution
               </p>
-              <p className="text-xs text-gray-600 dark:text-white/60">Hardware-Level Security</p>
+              <p className="text-xs text-gray-600 dark:text-white/60">
+                Hardware-Level Security
+              </p>
             </div>
           </motion.div>
 
