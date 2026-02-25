@@ -1,0 +1,9 @@
+﻿cargo :     Finished `dev` profile [unoptimized + 
+debuginfo] target(s) in 0.49s
+At line:1 char:1
++ cargo check 2>&1 | Out-File -Encoding utf8 cargo_check.txt
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished ` 
+   d...get(s) in 0.49s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

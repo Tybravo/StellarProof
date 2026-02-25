@@ -1,0 +1,7 @@
+﻿
+running 1 test
+[ContractEvent { ext: V0, contract_id: Some(ContractId(Hash(0000000000000000000000000000000000000000000000000000000000000001))), type_: Contract, body: V0(ContractEventV0 { topics: VecM([Symbol(ScSymbol(StringM(stellar_proof))), Symbol(ScSymbol(StringM(TeeHashRemoved))), Bytes(ScBytes(BytesM(0202020202020202020202020202020202020202020202020202020202020202)))]), data: Map(Some(ScMap(VecM([ScMapEntry { key: Symbol(ScSymbol(StringM(hash))), val: Bytes(ScBytes(BytesM(0202020202020202020202020202020202020202020202020202020202020202))) }])))) }) }]
+test test::test_registry_events ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s
+

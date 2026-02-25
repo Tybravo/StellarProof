@@ -1,0 +1,7 @@
+﻿
+running 1 test
+ProviderAdded: [ContractEvent { ext: V0, contract_id: Some(ContractId(Hash(0000000000000000000000000000000000000000000000000000000000000001))), type_: Contract, body: V0(ContractEventV0 { topics: VecM([Symbol(ScSymbol(StringM(stellar_proof))), Symbol(ScSymbol(StringM(ProviderAdded))), Bytes(ScBytes(BytesM(0101010101010101010101010101010101010101010101010101010101010101)))]), data: Map(Some(ScMap(VecM([ScMapEntry { key: Symbol(ScSymbol(StringM(provider))), val: Bytes(ScBytes(BytesM(0101010101010101010101010101010101010101010101010101010101010101))) }])))) }) }]
+test test::test_individual_events ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.04s
+
