@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Footer from "@/components/Footer";
+import ScrollToTop from "@/components/ui/ScrollToTop";
 import "./globals.css";
 import { WalletProvider } from "../context/WalletContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -54,6 +55,7 @@ export default function RootLayout({
           <WalletProvider>
             {children}
             <Footer />
+            <ScrollToTop />
           </WalletProvider>
         </ThemeProvider>
       </body>
