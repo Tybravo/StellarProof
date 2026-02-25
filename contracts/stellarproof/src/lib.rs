@@ -13,6 +13,7 @@ pub enum VerificationError {
     InvalidSignature = 3,
     InvalidAttestation = 4,
     AlreadyProcessed = 5,
+    InvalidTeeHash = 6,
 }
 
 #[contracttype]
@@ -34,6 +35,7 @@ pub struct VerificationRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Attestation {
     pub provider: BytesN<32>,
+    pub tee_hash: BytesN<32>,
     pub request_id: u64,
 }
 
@@ -176,6 +178,19 @@ impl StellarProof {
             return Ok(req.state);
         }
 
+        // 4.1 TEE Hash check
+        let is_tee_authorized: bool = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TeeHash(attestation.tee_hash.clone()))
+            .unwrap_or(false);
+
+        if !is_tee_authorized {
+            req.state = RequestState::Rejected(String::from_str(&env, "InvalidTeeHash"));
+            env.storage().persistent().set(&DataKey::Request(request_id), &req);
+            return Ok(req.state);
+        }
+
         // 5. Attestation validation
         if attestation.request_id != request_id {
             req.state = RequestState::Rejected(String::from_str(&env, "InvalidAttestation"));
@@ -193,4 +208,3 @@ impl StellarProof {
 
 #[cfg(test)]
 mod test;
-

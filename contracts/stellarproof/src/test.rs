@@ -27,19 +27,22 @@ fn test_successful_verification() {
     let client = StellarProofClient::new(&env, &contract_id);
 
     let (signing_key, pk) = create_keypair(&env, 1);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
 
     // Setup
     client.add_provider(&pk);
+    client.add_tee_hash(&tee_hash);
     client.create_request(&1);
 
     // Create attestation
     let attestation = Attestation {
         provider: pk.clone(),
+        tee_hash: tee_hash.clone(),
         request_id: 1,
     };
 
     let payload = attestation.clone().to_xdr(&env);
-    let mut payload_buf = [0u8; 1024];
+    let mut payload_buf = [0u8; 2048];
     let payload_slice = {
         let len = payload.len() as usize;
         payload.copy_into_slice(&mut payload_buf[..len]);
@@ -63,19 +66,22 @@ fn test_invalid_signature() {
 
     let (_signing_key, pk) = create_keypair(&env, 1);
     let (_other_key, _other_pk) = create_keypair(&env, 2);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
 
     // Setup
     client.add_provider(&pk);
+    client.add_tee_hash(&tee_hash);
     client.create_request(&1);
 
     // Create attestation
     let attestation = Attestation {
-        provider: pk.clone(), // claims to be pk
+        provider: pk.clone(),
+        tee_hash: tee_hash.clone(),
         request_id: 1,
     };
 
     let payload = attestation.clone().to_xdr(&env);
-    let mut payload_buf = [0u8; 1024];
+    let mut payload_buf = [0u8; 2048];
     let payload_slice = {
         let len = payload.len() as usize;
         payload.copy_into_slice(&mut payload_buf[..len]);
@@ -96,17 +102,20 @@ fn test_unauthorized_provider() {
     let client = StellarProofClient::new(&env, &contract_id);
 
     let (signing_key, pk) = create_keypair(&env, 1);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
     // DO NOT AUTHORIZE this provider
 
+    client.add_tee_hash(&tee_hash);
     client.create_request(&1);
 
     let attestation = Attestation {
         provider: pk.clone(),
+        tee_hash: tee_hash.clone(),
         request_id: 1,
     };
 
     let payload = attestation.clone().to_xdr(&env);
-    let mut payload_buf = [0u8; 1024];
+    let mut payload_buf = [0u8; 2048];
     let payload_slice = {
         let len = payload.len() as usize;
         payload.copy_into_slice(&mut payload_buf[..len]);
@@ -118,9 +127,45 @@ fn test_unauthorized_provider() {
     let result = client.try_process_verification(&1, &attestation, &signature);
     assert_eq!(result, Ok(Ok(RequestState::Rejected(soroban_sdk::String::from_str(&env, "Unauthorized")))));
 
-    // Request state should be updated to Rejected
     let req = client.get_request(&1).unwrap();
     assert_eq!(req.state, RequestState::Rejected(soroban_sdk::String::from_str(&env, "Unauthorized")));
+}
+
+#[test]
+fn test_invalid_tee_hash() {
+    let env = Env::default();
+    let contract_id = env.register(StellarProof, ());
+    let client = StellarProofClient::new(&env, &contract_id);
+
+    let (signing_key, pk) = create_keypair(&env, 1);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
+    let unauthorized_tee_hash = BytesN::from_array(&env, &[88; 32]);
+
+    client.add_provider(&pk);
+    // DO NOT AUTHORIZE authorized_tee_hash
+    client.create_request(&1);
+
+    let attestation = Attestation {
+        provider: pk.clone(),
+        tee_hash: unauthorized_tee_hash.clone(),
+        request_id: 1,
+    };
+
+    let payload = attestation.clone().to_xdr(&env);
+    let mut payload_buf = [0u8; 2048];
+    let payload_slice = {
+        let len = payload.len() as usize;
+        payload.copy_into_slice(&mut payload_buf[..len]);
+        &payload_buf[..len]
+    };
+    
+    let signature = sign_payload(&env, &signing_key, payload_slice);
+
+    let result = client.try_process_verification(&1, &attestation, &signature);
+    assert_eq!(result, Ok(Ok(RequestState::Rejected(soroban_sdk::String::from_str(&env, "InvalidTeeHash")))));
+
+    let req = client.get_request(&1).unwrap();
+    assert_eq!(req.state, RequestState::Rejected(soroban_sdk::String::from_str(&env, "InvalidTeeHash")));
 }
 
 #[test]
@@ -130,18 +175,21 @@ fn test_invalid_attestation() {
     let client = StellarProofClient::new(&env, &contract_id);
 
     let (signing_key, pk) = create_keypair(&env, 1);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
 
     client.add_provider(&pk);
+    client.add_tee_hash(&tee_hash);
     client.create_request(&1); // id is 1
 
     // Attestation claims id is 2
     let attestation = Attestation {
         provider: pk.clone(),
+        tee_hash: tee_hash.clone(),
         request_id: 2,
     };
 
     let payload = attestation.clone().to_xdr(&env);
-    let mut payload_buf = [0u8; 1024];
+    let mut payload_buf = [0u8; 2048];
     let payload_slice = {
         let len = payload.len() as usize;
         payload.copy_into_slice(&mut payload_buf[..len]);
@@ -154,7 +202,6 @@ fn test_invalid_attestation() {
     let result = client.try_process_verification(&1, &attestation, &signature);
     assert_eq!(result, Ok(Ok(RequestState::Rejected(soroban_sdk::String::from_str(&env, "InvalidAttestation")))));
 
-    // Request state should be updated to Rejected
     let req = client.get_request(&1).unwrap();
     assert_eq!(req.state, RequestState::Rejected(soroban_sdk::String::from_str(&env, "InvalidAttestation")));
 }
@@ -166,16 +213,18 @@ fn test_not_found() {
     let client = StellarProofClient::new(&env, &contract_id);
 
     let (signing_key, pk) = create_keypair(&env, 1);
+    let tee_hash = BytesN::from_array(&env, &[77; 32]);
 
     // No request is created
 
     let attestation = Attestation {
         provider: pk.clone(),
+        tee_hash: tee_hash.clone(),
         request_id: 1,
     };
 
     let payload = attestation.clone().to_xdr(&env);
-    let mut payload_buf = [0u8; 1024];
+    let mut payload_buf = [0u8; 2048];
     let payload_slice = {
         let len = payload.len() as usize;
         payload.copy_into_slice(&mut payload_buf[..len]);
@@ -188,12 +237,8 @@ fn test_not_found() {
     assert_eq!(result, Err(Ok(VerificationError::NotFound)));
 }
 
-
-
-
 #[test]
 fn test_registry_events() {
-    extern crate std;
     let env = Env::default();
     let contract_id = env.register(StellarProof, ());
     let client = StellarProofClient::new(&env, &contract_id);
