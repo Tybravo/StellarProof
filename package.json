@@ -8,7 +8,7 @@
     "prepare": "husky",
     "check:frontend": "pnpm --filter web lint",
     "build:frontend": "pnpm --filter web build",
-    "build:contracts": "node scripts/build-contracts.mjs"
+    "build:contracts": "cd contracts/oracle && stellar contract build && cd ../provenance && stellar contract build && cd ../registry && stellar contract build"
   },
   "lint-staged": {
     "frontend/**/*.{ts,tsx}": [

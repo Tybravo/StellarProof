@@ -39,5 +39,9 @@ jobs:
 
     - name: Build Smart Contracts
       run: |
-        cd contracts/stellarproof
-        cargo build --target wasm32-unknown-unknown --release
+        for contract in oracle provenance registry; do
+          echo "Building $contract..."
+          cd contracts/$contract
+          cargo build --target wasm32-unknown-unknown --release
+          cd ../..
+        done

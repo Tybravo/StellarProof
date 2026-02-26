@@ -24,6 +24,7 @@ export default function Ecosystem({ className = "" }: EcosystemProps) {
 
   // Prevent hydration mismatch and detect theme
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     
     // Check for dark mode using various methods

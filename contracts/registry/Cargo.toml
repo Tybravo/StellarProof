@@ -10,6 +10,7 @@ crate-type = ["cdylib", "lib"]
 soroban-sdk = "25.1.0"
 
 [dev-dependencies]
+ed25519-dalek = "2.2.0"
 soroban-sdk = { version = "25.1.0", features = ["testutils"] }
 
 [profile.release]

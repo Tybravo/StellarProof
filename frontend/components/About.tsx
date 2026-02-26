@@ -61,7 +61,7 @@ export default function About() {
                         className="max-w-3xl mx-auto text-lg text-gray-700 dark:text-white/70"
                     >
                         Stellar Proof combines cutting-edge hardware security with decentralized ledgers to
-                        provide an unshakeable foundation for the world's most sensitive data.
+                        provide an unshakeable foundation for the world&apos;s most sensitive data.
                     </motion.p>
                 </div>
 

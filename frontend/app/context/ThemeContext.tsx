@@ -31,6 +31,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         try {
             const stored = localStorage.getItem('stellarproof-theme') as Theme | null;
             if (stored === 'light') {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setTheme('light');
                 applyTheme('light');
             } else {
