@@ -108,6 +108,7 @@ export default function Footer() {
                 "Troubleshooting",
                 "API Reference",
                 "Report an Issue",
+                "Contact Us",
               ],
             },
             {
@@ -138,7 +139,11 @@ export default function Footer() {
               <nav className="space-y-3">
                 {section.links.map((link) => {
                   const href =
-                    link === "Report an Issue" ? "/report-issue" : "#";
+                    link === "Report an Issue"
+                      ? "/report-issue"
+                      : link === "Contact Us"
+                        ? "/contact"
+                        : "#";
                   return (
                     <a
                       key={link}
