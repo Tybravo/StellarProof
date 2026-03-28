@@ -27,8 +27,9 @@ fn test_mint_certificate() {
     let cert_id = client.mint(&owner, &details);
     assert_eq!(cert_id, 1);
 
+    let cert = client.get_certificate(&cert_id);
     let certificate = client.get_certificate(&cert_id);
-    assert!(certificate.is_some());
+    assert!(certificate.is_ok());
 
     let cert = certificate.unwrap();
     assert_eq!(cert.storage_id, details.storage_id);
@@ -79,9 +80,12 @@ fn test_mint_multiple_certificates() {
     assert_eq!(cert_id3, 3);
 
     // Verify all certificates exist
-    assert!(client.get_certificate(&cert_id1).is_some());
-    assert!(client.get_certificate(&cert_id2).is_some());
-    assert!(client.get_certificate(&cert_id3).is_some());
+    client.get_certificate(&cert_id1);
+    client.get_certificate(&cert_id2);
+    client.get_certificate(&cert_id3);
+    assert!(client.get_certificate(&cert_id1).is_ok());
+    assert!(client.get_certificate(&cert_id2).is_ok());
+    assert!(client.get_certificate(&cert_id3).is_ok());
 }
 
 #[test]
@@ -90,8 +94,15 @@ fn test_get_nonexistent_certificate() {
     let contract_id = env.register(ProvenanceContract, ());
     let client = ProvenanceContractClient::new(&env, &contract_id);
 
-    let certificate = client.get_certificate(&999);
-    assert!(certificate.is_none());
+    let result = client.try_get_certificate(&999);
+    match result {
+        // Contract call succeeded but returned our custom error
+        Err(Ok(ProvenanceError::CertificateNotFound)) => {}
+        other => panic!(
+            "expected CertificateNotFound error, got: {other:?}"
+        ),
+    }
+    assert_eq!(result, Ok(Err(ProvenanceError::CertificateNotFound)));
 }
 
 #[test]
@@ -176,7 +187,7 @@ fn test_immutable_timestamp() {
     };
 
     let cert_id = client.mint(&owner, &details);
-    let cert = client.get_certificate(&cert_id).unwrap();
+    let cert = client.get_certificate(&cert_id);
     let stored_timestamp = cert.timestamp;
     assert_eq!(
         stored_timestamp,
@@ -184,10 +195,42 @@ fn test_immutable_timestamp() {
         "timestamp must equal ledger time at mint"
     );
 
-    let cert_again = client.get_certificate(&cert_id).unwrap();
+    let cert_again = client.get_certificate(&cert_id);
     assert_eq!(
         cert_again.timestamp,
         stored_timestamp,
         "timestamp is immutable and must not change on subsequent reads"
     );
+}
+
+#[test]
+#[should_panic(expected = "Certificate already exists for this manifest hash")]
+fn test_prevent_duplicate_manifest_hash() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ProvenanceContract, ());
+    let client = ProvenanceContractClient::new(&env, &contract_id);
+
+    let oracle = Address::generate(&env);
+    let owner = Address::generate(&env);
+
+    client.initialize(&oracle);
+
+    let details1 = CertificateDetails {
+        storage_id: String::from_str(&env, "s1"),
+        manifest_hash: String::from_str(&env, "dup_hash"),
+        attestation_hash: String::from_str(&env, "a1"),
+    };
+    let details2 = CertificateDetails {
+        storage_id: String::from_str(&env, "s2"),
+        manifest_hash: String::from_str(&env, "dup_hash"),
+        attestation_hash: String::from_str(&env, "a2"),
+    };
+
+    // First mint should succeed and create the mapping
+    let _ = client.mint(&owner, &details1);
+
+    // Second mint with the same manifest_hash must fail with a clear error
+    let _ = client.mint(&owner, &details2);
 }

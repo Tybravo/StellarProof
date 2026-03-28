@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdvancedInput } from './AdvancedInput';
-import { ManifestAttachment } from './ManifestAttachment';
+import { ManifestAttachment } from '../features/verification/components/ManifestAttachment';
 import { isValidSHA256, validateSHA256 } from '../utils/validation';
 
 export const ValidationDemo: React.FC = () => {

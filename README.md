@@ -16,7 +16,8 @@ StellarProof provides **Proof-as-a-Service APIs**, allowing any application to v
 | **Goal**                      | Provide verifiable, auditable provenance for digital media and metadata |
 | **Blockchain**                | Stellar Network                                    |
 | **Smart Contracts**           | Soroban (Rust)                                     |
-| **Frontend + Business Logic** | Next.js + TypeScript + Tailwind CSS                |
+| **Frontend**                  | Next.js + TypeScript + Tailwind CSS                |
+| **Backend (Business Logic)**  | Node.js + Express + TypeScript + MongoDB           |
 | **Storage Layer**             | IPFS (Decentralized) or MongoDB (High Performance) |
 | **Encryption Layer**          | StellarProof Key Management Service (KMS)          |
 | **Trusted Verification Layer**| Oracle-driven TEE using AWS Nitro Enclave          |
@@ -111,6 +112,15 @@ StellarProof/
 │   │           └── page.tsx
 │   ├── components/
 │   └── styles/
+│
+├── backend/               # Node.js + Express backend (Business Logic & APIs)
+│   ├── src/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── routes/
+│   │   └── index.ts
+│   ├── package.json
+│   └── tsconfig.json
 │
 ├── oracle-worker/         # TEE orchestration worker
 │   ├── src/
@@ -235,6 +245,7 @@ Each attestation includes:
 | **Blockchain**      | Stellar Network                     |
 | **Smart Contracts** | Soroban (Rust)                      |
 | **Frontend**        | Next.js + TypeScript + Tailwind CSS |
+| **Backend**         | Node.js + Express + TypeScript      |
 | **Storage**         | IPFS / MongoDB                      |
 | **Encryption**      | Custom KMS                          |
 | **Trusted Compute** | AWS Nitro Enclave                   |
@@ -268,13 +279,19 @@ Each attestation includes:
     pnpm dev
     ```
 
-3.  **Run Oracle Worker**
+3.  **Run Backend**
+    ```bash
+    cd backend
+    pnpm dev
+    ```
+
+4.  **Run Oracle Worker**
     ```bash
     cd oracle-worker
     pnpm dev
     ```
 
-4.  **Compile Smart Contracts**
+5.  **Compile Smart Contracts**
     ```bash
     cd contracts
     cargo build --target wasm32-unknown-unknown --release

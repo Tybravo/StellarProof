@@ -25,11 +25,15 @@ jobs:
       with:
         node-version: 20
 
-    - name: Enable Corepack
-      run: corepack enable
+    # Better: Use the official pnpm action
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8  # or specify your pnpm version, e.g., 7, 8, latest
+        run_install: false
 
     - name: Install dependencies
-       run: pnpm install --no-frozen-lockfile
+      run: pnpm install --no-frozen-lockfile
 
     - name: Lint Frontend
       run: pnpm check:frontend

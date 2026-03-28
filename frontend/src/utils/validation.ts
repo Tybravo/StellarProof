@@ -25,6 +25,31 @@ export function isValidSHA256(hash: string): boolean {
   return SHA256_REGEX.test(hash);
 }
 
+
+export const isValidEthereumAddress = (value: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
+};
+
+export const isValidAssetCode = (value: string): boolean => {
+  return value.trim().length >= 3;
+};
+
+export const isValidAmount = (value: string): boolean => {
+  const amount = Number(value);
+  return !isNaN(amount) && amount > 0;
+};
+
+/**
+ * Validates a Stellar Public Key (Address)
+ * Must start with "G" and be exactly 56 characters from the base32 alphabet (A-Z, 2-7)
+ */
+export const isValidStellarAddress = (address: string): boolean => {
+  if (!address || typeof address !== 'string') {
+    return false;
+  }
+  return /^G[A-Z2-7]{55}$/.test(address);
+};
+
 /**
  * Validates a SHA256 hash and returns an error message if invalid
  * 

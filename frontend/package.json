@@ -11,18 +11,30 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^9.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@heroicons/react": "^2.2.0",
+    "@hookform/resolvers": "^5.2.2",
     "@stellar/freighter-api": "^6.0.1",
+    "clsx": "^2.1.1",
+    "fast-xml-parser": "^5.4.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.468.0",
     "next": "16.1.6",
+    "prismjs": "^1.30.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-dropzone": "^15.0.0"
+    "react-dropzone": "^15.0.0",
+    "react-hook-form": "^7.71.2",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

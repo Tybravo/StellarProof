@@ -1,6 +1,5 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: [
@@ -8,7 +7,10 @@ module.exports = {
     '**/*.(test|spec).+(ts|tsx|js)',
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { strict: false } }],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/../$1',
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

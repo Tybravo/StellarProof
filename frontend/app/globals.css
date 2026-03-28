@@ -52,6 +52,13 @@
   --foreground: #f3f4f6;
 }
 
+/* Gradient utilities */
+@layer utilities {
+  .bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+  }
+}
+
 html {
   scroll-behavior: smooth;
   color-scheme: light dark;
@@ -62,6 +69,21 @@ body {
   color: var(--foreground);
   /* Smooth transition when theme class is toggled */
   transition: background-color 300ms ease, color 300ms ease;
+  overflow-x: hidden;
+}
+
+/* Smooth scrolling for all browsers */
+@supports (scroll-behavior: smooth) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Performance optimization for smooth animations */
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Global smooth transitions for elements */

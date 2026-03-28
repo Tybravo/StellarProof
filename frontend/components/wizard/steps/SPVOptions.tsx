@@ -9,7 +9,7 @@
 
 import React, { useCallback, useState } from "react";
 import { ShieldCheck, ShieldOff, Info, AlertTriangle } from "lucide-react";
-import { useWizard } from "@/context/WizardContext";
+import { useWizard } from "../../../context/WizardContext";
 
 export default function SPVOptions() {
   const { state, setEncryptionEnabled } = useWizard();

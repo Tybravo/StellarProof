@@ -9,8 +9,8 @@
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, FileImage, FileText, X, Loader2, CheckCircle2 } from "lucide-react";
-import { hashFile } from "@/utils/hashing";
-import { useWizard } from "@/context/WizardContext";
+import { hashFile } from "../../../utils/hashing";
+import { useWizard } from "../../../context/WizardContext";
 
 /** Accepted MIME types for file upload. */
 const ACCEPTED_TYPES: Record<string, string[]> = {

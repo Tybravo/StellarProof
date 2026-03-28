@@ -16,8 +16,8 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { computeSHA256 } from "@/utils/crypto";
-import { useWizard, type ManifestData } from "@/context/WizardContext";
+import { computeSHA256 } from "../../../utils/crypto";
+import { useWizard, type ManifestData } from "../../../context/WizardContext";
 
 const ACCEPTED_EXTENSIONS = [".json", ".xml"];
 

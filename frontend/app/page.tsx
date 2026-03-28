@@ -1,11 +1,9 @@
-import { Suspense } from "react";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import About from "@/components/About";
 import HowItWorks from "@/components/HowItWorks";
 import Ecosystem from "@/components/Ecosystem";
 import CallToAction from "@/components/CallToAction";
-import ManifestModalTrigger from "@/components/manifest/ManifestModalTrigger";
 
 export default function Home() {
   return (
@@ -15,13 +13,9 @@ export default function Home() {
         <HeroSection />
         <About />
         <HowItWorks />
-        <Suspense fallback={<div className="h-96" />}>
-          <ManifestModalTrigger />
-        </Suspense>
         <Ecosystem />
         <CallToAction />
       </main>
     </div>
   );
 }
-

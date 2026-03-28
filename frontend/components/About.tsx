@@ -27,7 +27,7 @@ export default function About() {
     };
 
     return (
-        <section id="about" className="relative w-full overflow-hidden bg-white dark:bg-darkblue py-24 sm:py-32 transition-colors duration-300">
+        <section id="about" className="relative w-full overflow-hidden bg-white dark:bg-darkblue py-24 sm:py-32">
             {/* Background glow effects */}
             <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-secondary/10 dark:bg-secondary/20 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute right-0 bottom-0 translate-x-1/3 translate-y-1/3 w-[500px] h-[500px] bg-primary/10 dark:bg-primary/20 rounded-full blur-[120px] pointer-events-none" />

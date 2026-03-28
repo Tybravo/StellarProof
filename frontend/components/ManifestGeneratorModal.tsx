@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { X, FileText, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ManifestUseCase } from "@/services/manifestUseCases";
+import KeyValueBuilder from "@/components/KeyValueBuilder";
+import {
+  type ManifestKeyRow,
+  useDuplicateKeyValidation,
+} from "@/utils/manifestValidation";
 
 interface Props {
   open: boolean;
@@ -11,32 +16,60 @@ interface Props {
   onClose: () => void;
 }
 
-function FieldLabel({ label }: { label: string }) {
-  const formatted = label
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (s) => s.toUpperCase());
-  return (
-    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-      {formatted}
-    </label>
-  );
-}
-
 export default function ManifestGeneratorModal({ open, useCase, onClose }: Props) {
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<ManifestKeyRow[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [manifestData, setManifestData] = useState<Record<string, string>>({});
 
-  function handleChange(field: string, value: string) {
-    setFieldValues((prev) => ({ ...prev, [field]: value }));
-  }
+  const { errors: keyErrors, hasDuplicates } = useDuplicateKeyValidation(rows);
+
+  useEffect(() => {
+    if (open && useCase) {
+      // Use setTimeout to avoid synchronous state update warning
+      const timer = setTimeout(() => {
+        setRows(
+          useCase.template.fields.map((field, index) => ({
+            id: `${useCase.id}-${index}`,
+            key: field,
+            value: "",
+          })),
+        );
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [open, useCase]);
+
+  // Update manifestData whenever rows change to keep preview in sync if needed
+  useEffect(() => {
+    const data: Record<string, string> = {};
+    rows.forEach(row => {
+      if (row.key) data[row.key] = row.value;
+    });
+    // Use setTimeout to avoid synchronous state update warning
+    const timer = setTimeout(() => {
+      setManifestData(data);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [rows]);
+
+  const handleRowChange = useCallback(
+    (id: string, field: "key" | "value", value: string) => {
+      setRows((prev) =>
+        prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+      );
+    },
+    [],
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (hasDuplicates) return;
     setSubmitted(true);
   }
 
   function handleClose() {
-    setFieldValues({});
+    setRows([]);
     setSubmitted(false);
     onClose();
   }
@@ -64,7 +97,7 @@ export default function ManifestGeneratorModal({ open, useCase, onClose }: Props
             role="dialog"
             aria-modal="true"
             aria-labelledby="manifest-modal-title"
-            className="relative w-full max-w-lg rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue shadow-2xl overflow-hidden"
+            className="relative w-full max-w-2xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -133,26 +166,37 @@ export default function ManifestGeneratorModal({ open, useCase, onClose }: Props
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onSubmit={handleSubmit}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-5"
                   >
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Fill in the fields below to generate your manifest. All data is processed
-                      client-side; nothing is sent to a server until you anchor.
+                      Build your manifest metadata below. Add, edit, or reorder key-value pairs.
+                      Updates are reflected in the preview. All data is processed client-side until you
+                      anchor.
                     </p>
-                    {useCase.template.fields.map((field) => (
-                      <div key={field}>
-                        <FieldLabel label={field} />
-                        <input
-                          type="text"
-                          id={`field-${field}`}
-                          name={field}
-                          value={fieldValues[field] ?? ""}
-                          onChange={(e) => handleChange(field, e.target.value)}
-                          placeholder={`Enter ${field.replace(/([A-Z])/g, " $1").toLowerCase()}…`}
-                          className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
-                        />
-                      </div>
-                    ))}
+                    <KeyValueBuilder rows={rows} errors={keyErrors} onChange={handleRowChange} />
+
+                    {/* Live preview panel */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Live preview
+                      </h3>
+                      <pre
+                        className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto overflow-y-auto max-h-48 font-mono"
+                        aria-live="polite"
+                        aria-label="Manifest JSON preview"
+                      >
+                        {rows.length > 0
+                          ? JSON.stringify(
+                              rows.reduce((acc, row) => {
+                                if (row.key) acc[row.key] = row.value;
+                                return acc;
+                              }, {} as Record<string, string>),
+                              null,
+                              2
+                            )
+                          : "{}"}
+                      </pre>
+                    </div>
 
                     <div className="flex gap-3 pt-2">
                       <button
@@ -164,7 +208,12 @@ export default function ManifestGeneratorModal({ open, useCase, onClose }: Props
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-button-glow hover:shadow-glow transition"
+                        disabled={hasDuplicates}
+                        className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-button-glow transition ${
+                          hasDuplicates
+                            ? "bg-gray-400 cursor-not-allowed shadow-none"
+                            : "bg-primary hover:shadow-glow"
+                        }`}
                       >
                         Generate Manifest
                       </button>

@@ -40,3 +40,6 @@ extensions.json
 # Monorepo workspace and Dependency Management
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
+
+
+test_snapshots

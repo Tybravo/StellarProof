@@ -19,14 +19,19 @@ import {
   SearchX,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import Header from "@/components/Header";
-import ManifestGeneratorModal from "@/components/ManifestGeneratorModal";
+// import Header from "@/components/Header";
+// import ManifestGeneratorModal from "@/components/ManifestGeneratorModal";
+
+import Header from "../../components/Header";
+import ManifestGeneratorModal from "../../components/ManifestGeneratorModal";
 import {
   manifestUseCaseService,
   CATEGORIES,
   type ManifestUseCase,
   type Category,
-} from "@/services/manifestUseCases";
+} 
+// from "@/services/manifestUseCases";
+from "../../services/manifestUseCases";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Palette,

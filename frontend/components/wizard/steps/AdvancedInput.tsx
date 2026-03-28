@@ -8,8 +8,8 @@
 
 import React, { useCallback, useState } from "react";
 import { Clipboard, Info, CheckCircle2, AlertCircle } from "lucide-react";
-import { validateSHA256, isValidSHA256 } from "@/utils/crypto";
-import { useWizard } from "@/context/WizardContext";
+import { validateSHA256, isValidSHA256 } from "../../../utils/crypto";
+import { useWizard } from "../../../context/WizardContext";
 
 interface HashFieldProps {
   label: string;

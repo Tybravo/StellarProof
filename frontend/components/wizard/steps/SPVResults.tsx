@@ -8,7 +8,7 @@
 
 import React, { useCallback, useState } from "react";
 import { Copy, Check, ShieldCheck, Info, Eye, EyeOff } from "lucide-react";
-import { useWizard } from "@/context/WizardContext";
+import { useWizard } from "../../../context/WizardContext";
 
 /** Mask a hash string showing only first and last 8 characters. */
 function maskHash(hash: string): string {

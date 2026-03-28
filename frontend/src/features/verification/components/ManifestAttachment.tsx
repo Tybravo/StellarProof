@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { isValidSHA256, validateSHA256 } from '../utils/validation';
+import { isValidSHA256, validateSHA256 } from '../../../utils/validation';
 
 interface ManifestAttachmentProps {
   onHashSubmit: (hash: string) => void;

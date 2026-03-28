@@ -1,6 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, symbol_short, Address, Env, String,
+    contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, Address, Env,
+    String,
 };
 
 #[contractevent]
@@ -16,6 +17,13 @@ pub struct CertificateMinted {
 
 #[contract]
 pub struct ProvenanceContract;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ProvenanceError {
+    CertificateNotFound = 1,
+}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -74,6 +82,13 @@ impl ProvenanceContract {
         // Require authorization from the oracle contract only
         oracle.require_auth();
 
+        // Prevent duplicate certificates for the same manifest hash by maintaining
+        // a manifest_hash -> certificate_id mapping in storage.
+        let manifest_key = (symbol_short!("MANI"), details.manifest_hash.clone());
+        if env.storage().persistent().has(&manifest_key) {
+            panic!("Certificate already exists for this manifest hash");
+        }
+
         let mut counter: u64 = env
             .storage()
             .persistent()
@@ -92,6 +107,10 @@ impl ProvenanceContract {
 
         let cert_key = (symbol_short!("CERT"), counter);
         env.storage().persistent().set(&cert_key, &certificate);
+        // Store mapping from manifest_hash to certificate_id for fast duplicate checks.
+        env.storage()
+            .persistent()
+            .set(&manifest_key, &counter);
         env.storage()
             .persistent()
             .set(&symbol_short!("CERT_CNT"), &counter);
@@ -107,9 +126,18 @@ impl ProvenanceContract {
     }
 
     /// Get certificate by ID
-    pub fn get_certificate(env: Env, certificate_id: u64) -> Option<Certificate> {
+    ///
+    /// Returns `Ok(Certificate)` when a certificate with the given ID exists,
+    /// or `Err(ProvenanceError::CertificateNotFound)` when it does not.
+    pub fn get_certificate(
+        env: Env,
+        certificate_id: u64,
+    ) -> Result<Certificate, ProvenanceError> {
         let cert_key = (symbol_short!("CERT"), certificate_id);
-        env.storage().persistent().get(&cert_key)
+        env.storage()
+            .persistent()
+            .get(&cert_key)
+            .ok_or(ProvenanceError::CertificateNotFound)
     }
 }
 
