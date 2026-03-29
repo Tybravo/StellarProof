@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ui/ScrollToTop";
+import { DebugPanel } from "@/components/dev/DebugPanel";
 import "./globals.css";
 import { WalletProvider } from "../context/WalletContext";
 import { WizardProvider } from "../context/WizardContext";
@@ -70,6 +71,7 @@ export default function RootLayout({
                 {children}
                 <Footer />
                 <ScrollToTop />
+                <DebugPanel />
               </WizardProvider>
             </WalletProvider>
           </ToastProvider>
