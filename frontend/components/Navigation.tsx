@@ -14,7 +14,7 @@ const navItems = [
 export default function Navigation() {
   return (
     <section className="hidden xl:block fixed left-0 top-20 h-screen w-64 bg-gradient-to-b from-darkblue-dark/80 to-darkblue/60 backdrop-blur-sm border-r border-blue-500/10 z-40 pt-12">
-      <nav className="p-8">
+      <nav aria-label="Side navigation" className="p-8">
         <ul className="space-y-2">
           {navItems.map((item, index) => (
             <motion.li
@@ -25,10 +25,10 @@ export default function Navigation() {
             >
               <a
                 href={`#${item.id}`}
-                className="group flex items-center justify-between px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-blue-500/15 transition-all duration-300"
+                className="group flex items-center justify-between px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-blue-500/15 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
               >
                 <span className="font-medium">{item.label}</span>
-                <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-blue-300 group-hover:translate-x-1 transition-all" />
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-300 group-hover:translate-x-1 transition-all" aria-hidden="true" />
               </a>
             </motion.li>
           ))}

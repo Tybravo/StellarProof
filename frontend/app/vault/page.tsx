@@ -462,7 +462,7 @@ export default function VaultPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-darkblue-dark">
       <Header />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <main id="main-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
 
         {/* Page header */}
         <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">

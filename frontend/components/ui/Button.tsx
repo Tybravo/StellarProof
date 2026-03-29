@@ -25,14 +25,15 @@ export default function Button({
   className = "",
   ...rest
 }: Props) {
-  const base = "inline-flex items-center gap-2 px-3 py-2 rounded text-sm";
+  const base =
+    "inline-flex items-center gap-2 px-3 py-2 rounded text-sm min-h-[44px] min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors";
 
   if (href) {
     const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
     return (
       <a
         href={href}
-        className={`${base} ${className}  hover:bg-slate-800 text-slate-800 dark:text-slate-100`}
+        className={`${base} ${className} hover:bg-slate-800 text-slate-800 dark:text-slate-100`}
         {...anchorProps}
       >
         {children}

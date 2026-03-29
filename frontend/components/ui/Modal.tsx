@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 const FOCUSABLE =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -59,6 +59,7 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
 
+  const prefersReducedMotion = useReducedMotion();
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -142,16 +143,18 @@ export function Modal({
 
   if (typeof document === "undefined") return null;
 
+  const dur = prefersReducedMotion ? 0 : 0.2;
+
   return createPortal(
     <AnimatePresence>
       {open && (
         <ModalContext.Provider value={value}>
           <motion.div
             ref={overlayRef}
-            initial={{ opacity: 0 }}
+            initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            exit={{ opacity: prefersReducedMotion ? 1 : 0 }}
+            transition={{ duration: dur }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={handleOverlayClick}
           >
@@ -162,10 +165,10 @@ export function Modal({
               aria-labelledby={headerId}
               aria-describedby={bodyId}
               tabIndex={-1}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: prefersReducedMotion ? 1 : 0, scale: prefersReducedMotion ? 1 : 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: prefersReducedMotion ? 1 : 0, scale: prefersReducedMotion ? 1 : 0.95 }}
+              transition={{ duration: dur }}
               className={`relative w-full rounded-xl border border-white/10 bg-darkblue shadow-xl ${sizeClasses[size]} overflow-hidden`}
               onClick={(e) => e.stopPropagation()}
             >

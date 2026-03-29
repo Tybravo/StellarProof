@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Props = {
@@ -9,6 +9,8 @@ type Props = {
   header: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Accessible label for the toggle button (use when header content is not plain text) */
+  "aria-label"?: string;
 };
 
 export default function Accordion({
@@ -17,12 +19,13 @@ export default function Accordion({
   header,
   children,
   className = "",
+  "aria-label": ariaLabel,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (open && ref.current) {
-      // ensure expanded content is visible
       ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [open]);
@@ -33,7 +36,9 @@ export default function Accordion({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full text-left"
+        aria-controls={panelId}
+        aria-label={ariaLabel}
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset rounded-lg"
       >
         {header}
       </button>
@@ -41,6 +46,8 @@ export default function Accordion({
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
+            id={panelId}
+            role="region"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}

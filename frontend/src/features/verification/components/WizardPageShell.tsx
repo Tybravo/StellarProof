@@ -70,18 +70,32 @@ if (!hasHydrated) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617]">
-      <main className="container mx-auto max-w-4xl px-4 py-12">
+      {/* Screen reader live region announces step changes */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {`Step ${currentStep + 1} of ${STEPS.length}: ${STEPS[currentStep].label}`}
+      </div>
+
+      <main id="main-content" className="container mx-auto max-w-4xl px-4 py-12">
         <WizardStepper
           steps={STEPS}
           currentStep={currentStep}
         />
 
         <div className="mt-10 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-10 shadow-xl min-h-[400px]">
-          <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">
+          <h2
+            id="wizard-step-heading"
+            className="text-2xl font-bold mb-8 text-gray-900 dark:text-white"
+            tabIndex={-1}
+          >
             {STEPS[currentStep].label}
           </h2>
 
-          <div className="min-h-[200px]">
+          <div className="min-h-[200px]" aria-labelledby="wizard-step-heading">
             {stepComponents[currentStep]}
           </div>
 
@@ -97,8 +111,10 @@ if (!hasHydrated) {
 
         <div className="mt-6 text-center">
           <button
+            type="button"
             onClick={handleCancel}
-            className="text-xs uppercase tracking-widest text-gray-500 hover:text-red-500 transition-colors"
+            aria-label="Cancel and reset the wizard"
+            className="text-xs uppercase tracking-widest text-gray-500 hover:text-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 rounded"
           >
             Cancel & Reset Wizard
           </button>

@@ -148,10 +148,10 @@ export default function RequestRow({ request }: Props) {
     <Accordion
       open={open}
       onToggle={toggle}
+      aria-label={`${open ? "Collapse" : "Expand"} request ${shortHash(request?.hash ?? "")}, status: ${status}`}
       header={
         <div
           className="flex items-center justify-between gap-4 rounded-lg p-4 transition-colors hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
-          aria-expanded={open}
         >
           <div className="flex items-center gap-4 min-w-0">
             <div className="font-mono text-sm text-slate-700 dark:text-slate-300 truncate">

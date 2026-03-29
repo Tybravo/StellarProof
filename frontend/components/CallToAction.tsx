@@ -49,7 +49,7 @@ export default function CallToAction() {
           </h2>
 
           {/* Subtext */}
-          <p className="text-base md:text-lg text-gray-600 dark:text-white/60 mb-10 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-gray-600 dark:text-white/80 mb-10 max-w-2xl mx-auto">
             Join the ecosystem of creators and developers leveraging StellarProof to secure, verify, and immortalize digital assets with zero-trust architecture.
           </p>
 

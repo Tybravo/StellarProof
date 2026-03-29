@@ -54,6 +54,7 @@ export default function Footer() {
 
   return (
     <footer
+      aria-label="Site footer"
       className={`bg-gradient-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
     >
       <div className="max-w-7xl mx-auto">
@@ -75,15 +76,20 @@ export default function Footer() {
               contracts.
             </p>
             {/* Social Icons */}
-            <div className="flex gap-4">
-              {[DiscIcon, Github, Twitter, Send].map((Icon, idx) => (
+            <div className="flex gap-4" aria-label="Social media links">
+              {([
+                { Icon: DiscIcon, label: "StellarProof on Discord" },
+                { Icon: Github, label: "StellarProof on GitHub" },
+                { Icon: Twitter, label: "StellarProof on Twitter" },
+                { Icon: Send, label: "StellarProof on Telegram" },
+              ] as const).map(({ Icon, label }) => (
                 <a
-                  key={idx}
+                  key={label}
                   href="#"
-                  className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors`}
-                  aria-label="Social"
+                  className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
+                  aria-label={label}
                 >
-                  <Icon className={`w-5 h-5 ${iconColor}`} />
+                  <Icon className={`w-5 h-5 ${iconColor}`} aria-hidden="true" />
                 </a>
               ))}
             </div>
@@ -136,7 +142,7 @@ export default function Footer() {
               >
                 {section.title}
               </h3>
-              <nav className="space-y-3">
+              <nav aria-label={section.title} className="space-y-3">
                 {section.links.map((link) => {
                   const href =
                     link === "Report an Issue"

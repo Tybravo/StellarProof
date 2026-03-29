@@ -110,11 +110,12 @@ export default function Header() {
         {/* Logo */}
         <a
           href="#home"
+          aria-label="StellarProof — go to home"
           onClick={(e) => { e.preventDefault(); scrollToSection("#home"); }}
           className="flex shrink-0 items-center gap-2.5 outline-none transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue"
         >
           <LogoIcon />
-          <span className="text-xl font-semibold tracking-tight">
+          <span className="text-xl font-semibold tracking-tight" aria-hidden="true">
             <span className="text-primary">Stellar</span>
             <span className="text-secondary">Proof</span>
           </span>

@@ -34,7 +34,7 @@ export default function BuilderPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans selection:bg-primary/30">
       <Header />
       
-      <main className="container mx-auto px-4 py-12">
+      <main id="main-content" className="container mx-auto px-4 py-12">
         <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10">
           
           {/* LEFT SIDE: Inputs (Future implementation for form state) */}

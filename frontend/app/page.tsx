@@ -9,7 +9,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans selection:bg-primary/30">
       <Header />
-      <main className="w-full">
+      <main id="main-content" className="w-full">
         <HeroSection />
         <About />
         <HowItWorks />

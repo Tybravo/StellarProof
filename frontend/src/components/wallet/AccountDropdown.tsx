@@ -88,9 +88,11 @@ export function AccountDropdown() {
         )}
         aria-expanded={isOpen}
         aria-haspopup="true"
+        aria-controls="account-menu"
+        aria-label={`Wallet account ${shortenAddress(publicKey)}, ${isOpen ? "close" : "open"} account menu`}
       >
-        <div className="h-2 w-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
-        <span className="font-mono tracking-wide">
+        <div className="h-2 w-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]" aria-hidden="true" />
+        <span className="font-mono tracking-wide" aria-hidden="true">
           {shortenAddress(publicKey)}
         </span>
         <ChevronDown
@@ -98,6 +100,7 @@ export function AccountDropdown() {
             "h-4 w-4 text-white/70 transition-transform duration-200",
             isOpen && "rotate-180",
           )}
+          aria-hidden="true"
         />
       </button>
 
@@ -105,6 +108,9 @@ export function AccountDropdown() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            id="account-menu"
+            role="menu"
+            aria-label="Account options"
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -113,7 +119,7 @@ export function AccountDropdown() {
           >
             {/* Header / Address Info */}
             <div className="px-3 py-3 mb-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">
                 Connected Wallet
               </p>
               <p className="mt-1 truncate font-mono text-xs text-white/90">
@@ -124,8 +130,10 @@ export function AccountDropdown() {
             {/* Actions Group */}
             <div className="space-y-1 border-t border-white/5 pt-1.5">
               <button
+                role="menuitem"
                 onClick={handleCopy}
-                className="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label={copied ? "Address copied to clipboard" : "Copy wallet address to clipboard"}
+                className="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:ring-inset"
               >
                 <div className="flex items-center gap-3">
                   {copied ? (
@@ -136,17 +144,19 @@ export function AccountDropdown() {
                   <span>{copied ? "Copied to clipboard" : "Copy Address"}</span>
                 </div>
                 {!copied && (
-                  <span className="text-[10px] text-white/20 group-hover:text-white/40">
+                  <span className="text-[10px] text-white/50 group-hover:text-white/70" aria-hidden="true">
                     ⌘C
                   </span>
                 )}
               </button>
 
               <a
+                role="menuitem"
                 href={explorerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="View wallet on Stellar Explorer (opens in new tab)"
+                className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:ring-inset"
                 onClick={closeDropdown}
               >
                 <ExternalLink className="h-4 w-4 text-white/60 group-hover:text-white" />
@@ -157,11 +167,13 @@ export function AccountDropdown() {
             {/* Disconnect Action */}
             <div className="mt-1.5 border-t border-white/5 pt-1.5">
               <button
+                role="menuitem"
                 onClick={() => {
                   disconnect();
                   closeDropdown();
                 }}
-                className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-secondary transition-colors hover:bg-red-500/10 hover:text-red-400"
+                aria-label="Disconnect wallet"
+                className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-secondary transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50 focus-visible:ring-inset"
               >
                 <LogOut className="h-4 w-4 text-secondary group-hover:text-red-400" />
                 <span>Disconnect Wallet</span>
