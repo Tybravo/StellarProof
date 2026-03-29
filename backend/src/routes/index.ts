@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import spvRoutes from "./spv.routes";
+import verificationRoutes from "./verification.routes";
 
 const router = Router();
 
@@ -23,5 +24,10 @@ router.get("/health", (_req: Request, res: Response): void => {
  * /api/v1/spv/records  →  SPV record CRUD + NFT-gated decryption
  */
 router.use("/api/v1/spv/records", spvRoutes);
+
+/**
+ * /api/v1/verification/jobs  →  Verification Job lifecycle state machine
+ */
+router.use("/api/v1/verification/jobs", verificationRoutes);
 
 export default router;
