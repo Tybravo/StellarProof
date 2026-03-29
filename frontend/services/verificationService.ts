@@ -1,5 +1,4 @@
 
-import { signTransaction } from "@stellar/freighter-api";
 
 export interface SubmissionResult {
   txHash: string;
@@ -15,7 +14,6 @@ export interface SubmissionResult {
 export const submitVerificationRequest = async (
   contentHash: string,
   manifestHash: string | null,
-  publicKey: string
 ): Promise<SubmissionResult> => {
   
   // 1. MOCK IMPLEMENTATION (For Development/UI Testing)

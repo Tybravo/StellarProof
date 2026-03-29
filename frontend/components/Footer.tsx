@@ -44,7 +44,6 @@ export default function Footer() {
   const { theme } = useTheme();
 
   // Define theme‑dependent classes
-  const isDark = theme === "dark" || true; // Always use dark theme
   const bgGradient = "from-darkblue-dark via-darkblue to-darkblue-dark";
   const textPrimary = "text-white";
   const textSecondary = "text-gray-300";

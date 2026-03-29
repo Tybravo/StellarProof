@@ -4,6 +4,8 @@ import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, ArrowRight, ExternalLink } from "lucide-react";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
+import { useWizard } from "@/context/WizardContext"; // 1. Import the Wizard Context
+import ExportActions from "@/components/certificate/ExportActions";
 
 interface StatusStepProps {
   requestId: string;
@@ -11,13 +13,19 @@ interface StatusStepProps {
 }
 
 export default function StatusStep({ requestId, onReset }: StatusStepProps) {
+  // 2. Access the wizard state
+  const { state } = useWizard();
+  
   const { status, isLoading, lastChecked } = useVerificationStatus({ 
     requestId, 
     intervalMs: 5000 
   });
 
-  // Generate random particles for the success animation
-const particles = useMemo(() => {
+  // Determine which hash to show in the certificate (SPV vs Standard)
+  const finalHash = state.spvResult?.encryptedHash || state.contentHash || "N/A";
+
+  // Particles animation logic...
+  const particles = useMemo(() => {
     return Array.from({ length: 20 }).map((_, i) => ({
       id: i,
       // eslint-disable-next-line react-hooks/purity
@@ -37,7 +45,7 @@ const particles = useMemo(() => {
         <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
         <h2 className="text-2xl font-bold mb-2">Verifying on Stellar...</h2>
         <p className="text-gray-500 dark:text-gray-400">
-          The Soroban Oracle is currently processing your request. This usually takes a few seconds.
+          The Soroban Oracle is currently processing your request.
         </p>
       </div>
     );
@@ -45,6 +53,7 @@ const particles = useMemo(() => {
 
   return (
     <div className="relative overflow-hidden py-8 text-center">
+      {/* Particles Animation */}
       {status === 'Verified' && (
         <div className="absolute inset-0 pointer-events-none">
           {particles.map((p) => (
@@ -86,13 +95,27 @@ const particles = useMemo(() => {
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-8 max-w-md mx-auto">
           {status === 'Verified' 
             ? "Your content has been cryptographically signed and anchored to the Stellar network."
-            : "The oracle could not verify the authenticity of this content. Please check your source."}
+            : "The oracle could not verify the authenticity of this content."}
         </p>
+
+        {/* 3. Export Certificate Section */}
+        {status === 'Verified' && (
+          <div className="mb-8 max-w-md mx-auto transform transition-all hover:scale-[1.01]">
+            <ExportActions 
+              certificateData={{
+                id: requestId,
+                contentHash: finalHash,
+                txHash: requestId,
+                timestamp: new Date().toISOString()
+              }} 
+            />
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button 
             onClick={onReset}
-            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 active:scale-95"
           >
             New Request <ArrowRight className="ml-2 w-4 h-4" />
           </button>
