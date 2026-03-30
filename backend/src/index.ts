@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import healthRoutes from './routes/health.routes';
 import kmsRoutes from './routes/kms.routes';
+import spvRoutes from './routes/spv.routes';
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,7 @@ connectDB();
 // Routes
 app.use('/api/health', healthRoutes);
 app.use('/api/v1/kms', kmsRoutes);
+app.use('/api/v1/spv', spvRoutes);
 
 // Base route
 app.get('/', (req: Request, res: Response) => {
