@@ -3,14 +3,16 @@
 import { useWizardStore } from '../store/wizard.store';
 import WizardStepper from './WizardStepper';
 import WizardNavigation from './WizardNavigation';
+import ModeSelection from './steps/ModeSelection';
 import StepIdentity from './steps/StepIdentity';
 import StepDocuments from './steps/StepDocuments';
 import StepReview from './steps/StepReview';
 
 const STEPS = [
-  { id: 0, label: 'Identity' },
-  { id: 1, label: 'Documents' },
-  { id: 2, label: 'Review' },
+  { id: 0, label: 'Mode Selection' },
+  { id: 1, label: 'Identity' },
+  { id: 2, label: 'Documents' },
+  { id: 3, label: 'Review' },
 ];
 
 export default function WizardPageShell() {
@@ -63,6 +65,7 @@ if (!hasHydrated) {
   };
 
   const stepComponents = [
+    <ModeSelection key="mode" />,
     <StepIdentity key="identity" />,
     <StepDocuments key="documents" />,
     <StepReview key="review" />,

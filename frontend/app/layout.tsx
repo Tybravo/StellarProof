@@ -1,12 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next"; // <-- Added Viewport type
 import { Geist, Geist_Mono } from "next/font/google";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ui/ScrollToTop";
+import { DebugPanel } from "@/components/dev/DebugPanel";
 import "./globals.css";
+
 import { WalletProvider } from "../context/WalletContext";
 import { WizardProvider } from "../context/WizardContext";
 import { ToastProvider } from "../context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import QueryProvider from "../context/QueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,16 +21,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// 1. STANDARD METADATA (Viewport and ThemeColor removed from here)
 export const metadata: Metadata = {
   title: "StellarProof - The Truth Engine for Digital Content",
   description: "Verifiable digital authenticity powered by Soroban smart contracts. Cryptographically signed verification for digital content and media ecosystems.",
   keywords: "stellar, blockchain, verification, authenticity, soroban, smart contracts",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  },
+};
+
+// 2. NEW VIEWPORT EXPORT
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: "#256af4",
 };
 
@@ -67,9 +73,12 @@ export default function RootLayout({
           <ToastProvider>
             <WalletProvider>
               <WizardProvider>
-                {children}
-                <Footer />
-                <ScrollToTop />
+                <QueryProvider>
+                  {children}
+                  <Footer />
+                  <ScrollToTop />
+                  <DebugPanel />
+                </QueryProvider>
               </WizardProvider>
             </WalletProvider>
           </ToastProvider>

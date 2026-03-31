@@ -7,6 +7,7 @@ import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-markup'; 
 import { FormatToggle, ManifestFormat } from './FormatToggle';
+import DownloadActions from './DownloadActions';
 import { ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export interface ManifestData {
@@ -143,6 +144,14 @@ export const ManifestPreview = ({ manifestData }: { manifestData: ManifestData }
             </pre>
           </>
         )}
+      </div>
+
+      <div className="flex justify-end p-3 bg-[#161b22] border-t border-gray-800">
+        <DownloadActions 
+          content={formattedOutput}
+          format={format}
+          isDisabled={!!error}
+        />
       </div>
     </div>
   );

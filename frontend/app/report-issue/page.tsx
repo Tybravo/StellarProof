@@ -64,6 +64,7 @@ export default function ReportIssuePage() {
   
   // React Hook Form's watch function is not stable and can trigger re-renders or memoization issues.
   // We're capturing the specific field value here.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const screenshotFiles = watch("screenshot");
 
   // Initialize wallet and network

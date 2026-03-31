@@ -1,9 +1,5 @@
 "use client";
 
-// import { useTheme } from "@/app/context/ThemeContext";
-import { useTheme } from "../app/context/ThemeContext";
-
-
 // import { ThemeProvider } from './context/ThemeContext';
 import { Github, Twitter, Send, DiscIcon } from "lucide-react";
 
@@ -41,10 +37,6 @@ function LogoIcon() {
 }
 
 export default function Footer() {
-  const { theme } = useTheme();
-
-  // Define theme‑dependent classes
-  const isDark = theme === "dark" || true; // Always use dark theme
   const bgGradient = "from-darkblue-dark via-darkblue to-darkblue-dark";
   const textPrimary = "text-white";
   const textSecondary = "text-gray-300";
@@ -54,7 +46,7 @@ export default function Footer() {
 
   return (
     <footer
-      className={`bg-gradient-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
+      className={`bg-linear-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
     >
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">

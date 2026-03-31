@@ -80,6 +80,7 @@ export default function ContactPage() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const messageValue = watch("message") || "";
   const messageLength = messageValue.length;
 
