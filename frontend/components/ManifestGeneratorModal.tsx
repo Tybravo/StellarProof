@@ -14,9 +14,11 @@ interface Props {
   open: boolean;
   useCase: ManifestUseCase | null;
   onClose: () => void;
+  /** Called with the generated JSON string when the user clicks "Generate Manifest". */
+  onGenerated?: (content: string) => void;
 }
 
-export default function ManifestGeneratorModal({ open, useCase, onClose }: Props) {
+export default function ManifestGeneratorModal({ open, useCase, onClose, onGenerated }: Props) {
   const [rows, setRows] = useState<ManifestKeyRow[]>([]);
   const [submitted, setSubmitted] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -65,6 +67,15 @@ export default function ManifestGeneratorModal({ open, useCase, onClose }: Props
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (hasDuplicates) return;
+    const content = JSON.stringify(
+      rows.reduce((acc, row) => {
+        if (row.key) acc[row.key] = row.value;
+        return acc;
+      }, {} as Record<string, string>),
+      null,
+      2,
+    );
+    onGenerated?.(content);
     setSubmitted(true);
   }
 

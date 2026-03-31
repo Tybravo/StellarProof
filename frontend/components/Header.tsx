@@ -26,6 +26,12 @@ const NAV_LINKS = [
     ],
   },
   { href: "#pricing", label: "Pricing" },
+  {
+    label: "Demo",
+    children: [
+      { href: "/dashboard", label: "Verification Dashboard" },
+    ],
+  },
 ] as const;
 
 function scrollToSection(hash: string) {
@@ -184,8 +190,10 @@ export default function Header() {
                                   href={child.href}
                                   role="menuitem"
                                   onClick={(e) => {
-                                    e.preventDefault();
-                                    scrollToSection(child.href);
+                                    if (child.href.startsWith("#")) {
+                                      e.preventDefault();
+                                      scrollToSection(child.href);
+                                    }
                                     setOpenDropdown(null);
                                   }}
                                   className="block px-4 py-2 text-sm text-gray-700 dark:text-white/90 transition-colors duration-300 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white focus-visible:bg-gray-100 dark:focus-visible:bg-white/10 focus-visible:outline-none"
@@ -281,7 +289,14 @@ export default function Header() {
                               <li key={child.href}>
                                 <a
                                   href={child.href}
-                                  onClick={(e) => { e.preventDefault(); handleNavClick(child.href); }}
+                                  onClick={(e) => {
+                                    if (child.href.startsWith("#")) {
+                                      e.preventDefault();
+                                      handleNavClick(child.href);
+                                    } else {
+                                      setMobileOpen(false);
+                                    }
+                                  }}
                                   className="block rounded-lg py-2.5 pl-2 text-sm text-gray-600 dark:text-white/80 hover:text-gray-900 dark:hover:text-white transition-colors duration-300"
                                 >
                                   {child.label}
