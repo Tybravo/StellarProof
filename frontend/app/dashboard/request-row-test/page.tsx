@@ -1,8 +1,21 @@
 "use client";
 
-import RequestRow, { type Request } from "@/components/dashboard/RequestRow";
+import RequestRow from "@/components/dashboard/RequestRow";
 
-const mockRequest: Request = {
+// Define the interface to match what RequestRow expects
+interface RequestData {
+  id: string;
+  hash: string;
+  fullHash: string;
+  manifest: string;
+  attestation: string;
+  timestamp: string;
+  txHash: string;
+  certificateUrl: string;
+  status: "verified" | "pending" | "failed"; // Match the expected status types
+}
+
+const mockRequest: RequestData = {
   id: "1",
   hash: "0x1234567890abcdef1234567890abcdef",
   fullHash:
@@ -27,6 +40,7 @@ export default function Page() {
   return (
     <div className="p-8 bg-gray-500 min-h-screen">
       <div className="max-w-2xl mx-auto">
+        {/* Fixed: Removed 'as any' and used the typed mockRequest */}
         <RequestRow request={mockRequest} />
       </div>
     </div>

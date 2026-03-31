@@ -46,7 +46,7 @@ export default function Footer() {
 
   return (
     <footer
-      className={`bg-gradient-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
+      className={`bg-linear-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
     >
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
