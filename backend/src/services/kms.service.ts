@@ -186,3 +186,28 @@ export async function getAllKeys(userId: string): Promise<IKMSKey[]> {
     creatorId: userId
   }).sort({ createdAt: -1 });
 }
+
+/**
+ * Revokes a KMS key by setting isActive to false
+ * This effectively destroys access to any encrypted payload using this key
+ */
+export async function revokeKey(keyId: string): Promise<IKMSKey> {
+  // Validate that the key exists
+  const key = await KMSKey.findById(keyId);
+
+  if (!key) {
+    throw new Error('KMS key not found');
+  }
+
+  // Check if key is already inactive
+  if (!key.isActive) {
+    throw new Error('KMS key is already inactive');
+  }
+
+  // Revoke the key by setting isActive to false
+  key.isActive = false;
+  await key.save();
+
+  return key;
+}
+

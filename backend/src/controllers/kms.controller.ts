@@ -169,3 +169,64 @@ export const getActiveKey = async (req: Request, res: Response): Promise<void> =
     });
   }
 };
+
+/**
+ * DELETE /api/v1/kms/keys/:id
+ * Revokes a KMS key by setting isActive to false
+ * This effectively destroys access to any encrypted payload using this key
+ */
+export const revokeKey = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Invalid key ID format'
+      });
+      return;
+    }
+
+    // Call service layer
+    const revokedKey = await kmsService.revokeKey(id);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'KMS key revoked successfully',
+      data: {
+        id: revokedKey._id,
+        keyVersion: revokedKey.keyVersion,
+        isActive: revokedKey.isActive,
+        revokedAt: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error('Error in revokeKey controller:', error);
+
+    // Handle specific error cases
+    if (error.message === 'KMS key not found') {
+      res.status(404).json({
+        status: 'error',
+        message: error.message
+      });
+      return;
+    }
+
+    if (error.message === 'KMS key is already inactive') {
+      res.status(400).json({
+        status: 'error',
+        message: error.message
+      });
+      return;
+    }
+
+    // Generic error response
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while revoking the key',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
