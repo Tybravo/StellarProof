@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"; // <-- Added Viewport type
 import { Geist, Geist_Mono } from "next/font/google";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ui/ScrollToTop";
+import { DebugPanel } from "@/components/dev/DebugPanel";
 import "./globals.css";
 
 import { WalletProvider } from "../context/WalletContext";
@@ -72,10 +73,11 @@ export default function RootLayout({
           <ToastProvider>
             <WalletProvider>
               <WizardProvider>
-                <QueryProvider> 
+                <QueryProvider>
                   {children}
                   <Footer />
                   <ScrollToTop />
+                  <DebugPanel />
                 </QueryProvider>
               </WizardProvider>
             </WalletProvider>

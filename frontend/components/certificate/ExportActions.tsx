@@ -1,50 +1,67 @@
 "use client";
 
-import React from 'react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import { Download, FileText, Loader2 } from 'lucide-react';
-import { CertificateTemplate } from './CertificateTemplate';
+import React from "react";
 
-interface ExportActionsProps {
-  certificateData: {
-    id: string;
-    contentHash: string;
-    txHash: string;
-    timestamp: string;
-  };
+export interface CertificateData {
+  owner: string;
+  certificate_id: string;
+  manifest_hash: string;
+  content_hash: string;
+  attestation_hash: string;
+  timestamp: string | number;
+  network: string;
 }
 
-export default function ExportActions({ certificateData }: ExportActionsProps) {
-  const fileName = `stellarproof-certificate-${certificateData.id.slice(0, 8)}.pdf`;
+interface ExportActionsProps {
+  certificate: CertificateData | null;
+  isLoading?: boolean;
+}
+
+export function ExportActions({ certificate, isLoading = false }: ExportActionsProps) {
+  const handleDownloadJson = () => {
+    if (!certificate) return;
+
+    const exportData = {
+      owner: certificate.owner,
+      certificate_id: certificate.certificate_id,
+      manifest_hash: certificate.manifest_hash,
+      content_hash: certificate.content_hash,
+      attestation_hash: certificate.attestation_hash,
+      timestamp: certificate.timestamp,
+      network: certificate.network,
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `stellarproof-certificate-${certificate.certificate_id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const isDisabled = isLoading || !certificate;
 
   return (
-    <div className="flex flex-wrap gap-4 mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700">
-      <div className="flex-1">
-        <h4 className="text-sm font-semibold mb-1">Export Certificate</h4>
-        <p className="text-xs text-gray-500">Download a verified PDF copy for your records.</p>
-      </div>
-
-      <PDFDownloadLink
-        document={<CertificateTemplate data={certificateData} />}
-        fileName={fileName}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20"
-      >
-        {({ loading }) => (
-          <>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {loading ? "Preparing PDF..." : "Download PDF"}
-          </>
-        )}
-      </PDFDownloadLink>
-
+    <div className="flex gap-4 items-center">
       <button
-        type="button"
-        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        onClick={() => alert("Preview feature coming soon!")}
+        onClick={handleDownloadJson}
+        disabled={isDisabled}
+        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+          isDisabled
+            ? "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400"
+            : "bg-primary text-primary-foreground hover:bg-primary-light dark:bg-darkblue-light dark:hover:bg-primary"
+        }`}
       >
-        <FileText className="w-4 h-4" />
-        Preview
+        Download JSON
       </button>
     </div>
   );
 }
+export default ExportActions;

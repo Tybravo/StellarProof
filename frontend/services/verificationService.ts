@@ -1,5 +1,3 @@
-
-
 export interface SubmissionResult {
   txHash: string;
   requestId: string;
@@ -14,8 +12,10 @@ export interface SubmissionResult {
 export const submitVerificationRequest = async (
   contentHash: string,
   manifestHash: string | null,
+  publicKey: string
 ): Promise<SubmissionResult> => {
-  
+  void publicKey;
+
   // 1. MOCK IMPLEMENTATION (For Development/UI Testing)
   // In a real scenario, we'd fetch the network passphrase and contract ID from env
   console.log("Constructing Soroban transaction for:", { contentHash, manifestHash });
@@ -44,3 +44,26 @@ export const submitVerificationRequest = async (
  * .addOperation(contract.call("submit_request", ...))
  * .build();
  */
+export type VerificationStatus = "pending" | "verified" | "failed" | "processing";
+
+export interface VerificationRequest {
+  id: string;
+  date: string;
+  contentHash: string;
+  status: VerificationStatus;
+}
+
+const MOCK_REQUESTS: VerificationRequest[] = Array.from({ length: 37 }, (_, i) => ({
+  id: `REQ-${String(i + 1).padStart(4, "0")}`,
+  date: new Date(Date.now() - i * 86400000 * 2).toISOString().split("T")[0],
+  contentHash: `0x${Math.random().toString(16).slice(2).padEnd(64, "0")}`,
+  status: (["pending", "verified", "failed", "processing"] as VerificationStatus[])[i % 4],
+}));
+
+export const verificationService = {
+  async getRequests(publicKey: string): Promise<VerificationRequest[]> {
+    void publicKey;
+    await new Promise((r) => setTimeout(r, 400));
+    return MOCK_REQUESTS;
+  },
+};

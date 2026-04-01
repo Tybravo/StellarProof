@@ -1,125 +1,192 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Loader2, ArrowRight, ExternalLink } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { CheckCircle2, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
-import { useWizard } from "@/context/WizardContext"; // 1. Import the Wizard Context
-import ExportActions from "@/components/certificate/ExportActions";
+import { useWizard } from "@/context/WizardContext";
+import { ExportActions, type CertificateData } from "@/components/certificate/ExportActions";
+
+type LocalStatus = "Pending" | "Verified" | "Rejected" | "Timeout";
 
 interface StatusStepProps {
   requestId: string;
   onReset: () => void;
 }
 
-export default function StatusStep({ requestId, onReset }: StatusStepProps) {
-  // 2. Access the wizard state
-  const { state } = useWizard();
-  
-  const { status, isLoading, lastChecked } = useVerificationStatus({ 
-    requestId, 
-    intervalMs: 5000 
-  });
+interface Particle {
+  id: number;
+  x: number;
+  angle: number;
+  size: number;
+  driftX: number;
+  duration: number;
+  color: string;
+  borderRadius: number | "50%";
+}
 
-  // Determine which hash to show in the certificate (SPV vs Standard)
-  const finalHash = state.spvResult?.encryptedHash || state.contentHash || "N/A";
+const CONFETTI_COLORS = ["#256af4", "#60a5fa", "#ff7ce9", "#34d399", "#fbbf24"];
 
-  // Particles animation logic...
-  const particles = useMemo(() => {
-    return Array.from({ length: 20 }).map((_, i) => ({
-      id: i,
-      // eslint-disable-next-line react-hooks/purity
-      x: Math.random() * 100,
-      // eslint-disable-next-line react-hooks/purity
-      angle: Math.random() * 360,
-      // eslint-disable-next-line react-hooks/purity
-      size: Math.random() * 8 + 4,
-      // eslint-disable-next-line react-hooks/purity
-      color: Math.random() > 0.5 ? "#256af4" : "#10b981",
-    }));
-  }, []);
-
-  if (isLoading && status === 'Pending') {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
-        <h2 className="text-2xl font-bold mb-2">Verifying on Stellar...</h2>
-        <p className="text-gray-500 dark:text-gray-400">
-          The Soroban Oracle is currently processing your request.
-        </p>
-      </div>
-    );
+function hashSeed(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
+  return h >>> 0;
+}
+
+function generateParticles(seed: number, count = 36): Particle[] {
+  const rand = (s: number) => {
+    const x = Math.sin(s) * 10_000;
+    return x - Math.floor(x);
+  };
+
+  return Array.from({ length: count }, (_, i) => {
+    const base = seed + i * 97;
+    const r1 = rand(base + 1);
+    const r2 = rand(base + 2);
+    const r3 = rand(base + 3);
+    const r4 = rand(base + 4);
+    const r5 = rand(base + 5);
+    const r6 = rand(base + 6);
+    const r7 = rand(base + 7);
+
+    return {
+      id: i,
+      x: 40 + r1 * 20,
+      angle: r2 * 360,
+      size: 6 + r4 * 6,
+      driftX: (r6 - 0.5) * 30,
+      duration: 1.2 + r5 * 0.8,
+      color: CONFETTI_COLORS[Math.floor(r3 * CONFETTI_COLORS.length)],
+      borderRadius: r7 > 0.5 ? "50%" : 2,
+    };
+  });
+}
+
+function Confetti({ seed }: { seed: number }) {
+  const particles = useMemo(() => generateParticles(seed), [seed]);
 
   return (
-    <div className="relative overflow-hidden py-8 text-center">
-      {/* Particles Animation */}
-      {status === 'Verified' && (
-        <div className="absolute inset-0 pointer-events-none">
-          {particles.map((p) => (
-            <motion.div
-              key={p.id}
-              initial={{ y: -20, x: `${p.x}vw`, opacity: 1 }}
-              animate={{
-                y: "100vh",
-                // eslint-disable-next-line react-hooks/purity
-                x: `${p.x + (Math.random() - 0.5) * 30}vw`,
-                opacity: [1, 1, 0],
-                rotate: p.angle,
-              }}
-              transition={{ duration: 2.5, ease: "circOut" }}
-              style={{
-                position: "absolute",
-                width: p.size,
-                height: p.size,
-                // eslint-disable-next-line react-hooks/purity
-                borderRadius: Math.random() > 0.5 ? "50%" : 2,
-                backgroundColor: p.color,
-              }}
-            />
-          ))}
-        </div>
-      )}
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          initial={{ x: `${p.x}vw`, y: -10, opacity: 1, rotate: 0 }}
+          animate={{
+            y: "100vh",
+            x: `${p.x + p.driftX}vw`,
+            opacity: [1, 1, 0],
+            rotate: p.angle,
+          }}
+          transition={{ duration: p.duration, ease: "easeIn" }}
+          style={{
+            position: "absolute",
+            width: p.size,
+            height: p.size,
+            borderRadius: p.borderRadius,
+            backgroundColor: p.color,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
-      <div className="relative z-10">
-        {status === 'Verified' ? (
-          <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-6" />
-        ) : (
-          <XCircle className="w-20 h-20 text-red-500 mx-auto mb-6" />
-        )}
+export default function StatusStep({ requestId, onReset }: StatusStepProps) {
+  const { state } = useWizard();
+  const { status, isLoading, lastChecked } = useVerificationStatus({
+    requestId,
+    intervalMs: 5000,
+  });
 
-        <h2 className="text-3xl font-bold mb-4">
-          Verification {status === 'Verified' ? 'Successful' : 'Failed'}
-        </h2>
-        
+  const normalized = (status === "Timeout" ? "Timeout" : status) as LocalStatus;
+  const confettiSeed = useMemo(() => hashSeed(requestId), [requestId]);
+
+  const isVerified = normalized === "Verified";
+  const isRejected = normalized === "Rejected";
+  const isTimeout = normalized === "Timeout";
+  const isPending = normalized === "Pending";
+
+  const finalHash = state.spvResult?.encryptedHash || state.contentHash || "N/A";
+  const manifestHash =
+    state.manifestHash || state.advancedManifestHash || "N/A";
+
+  const certificate: CertificateData = useMemo(
+    () => ({
+      owner: "N/A",
+      certificate_id: requestId,
+      manifest_hash: manifestHash,
+      content_hash: finalHash,
+      attestation_hash: requestId,
+      timestamp: new Date().toISOString(),
+      network: "stellar-testnet",
+    }),
+    [finalHash, manifestHash, requestId]
+  );
+
+  const title = isVerified
+    ? "Verification Successful"
+    : isRejected
+      ? "Verification Failed"
+      : isTimeout
+        ? "Verification Timed Out"
+        : "Verifying on Stellar…";
+
+  const subtitle = isVerified
+    ? "Your content has been cryptographically signed and anchored to the Stellar network."
+    : isRejected
+      ? "The oracle could not verify the authenticity of this content. Please check your source."
+      : isTimeout
+        ? "The oracle did not respond within the expected timeframe."
+        : "The Soroban Oracle is currently processing your request. This usually takes a few seconds.";
+
+  const icon = isVerified ? (
+    <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" aria-hidden />
+  ) : isRejected || isTimeout ? (
+    <XCircle className="w-16 h-16 text-red-500 mb-6" aria-hidden />
+  ) : (
+    <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" aria-hidden />
+  );
+
+  return (
+    <div className="relative w-full max-w-xl mx-auto py-12 text-center">
+      <AnimatePresence>
+        {isVerified && <Confetti key={`confetti-${requestId}`} seed={confettiSeed} />}
+      </AnimatePresence>
+
+      <div className="flex flex-col items-center justify-center">
+        {icon}
+        <motion.h2
+          key={normalized}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-3xl font-bold mb-4 text-gray-900 dark:text-white"
+        >
+          {title}
+        </motion.h2>
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-8 max-w-md mx-auto">
-          {status === 'Verified' 
-            ? "Your content has been cryptographically signed and anchored to the Stellar network."
-            : "The oracle could not verify the authenticity of this content."}
+          {subtitle}
         </p>
 
-        {/* 3. Export Certificate Section */}
-        {status === 'Verified' && (
-          <div className="mb-8 max-w-md mx-auto transform transition-all hover:scale-[1.01]">
-            <ExportActions 
-              certificateData={{
-                id: requestId,
-                contentHash: finalHash,
-                txHash: requestId,
-                timestamp: new Date().toISOString()
-              }} 
-            />
+        {isVerified && (
+          <div className="mb-8 max-w-md mx-auto">
+            <ExportActions certificate={certificate} isLoading={isLoading} />
           </div>
         )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button 
+          <button
+            type="button"
             onClick={onReset}
-            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 active:scale-95"
+            disabled={isLoading && isPending}
+            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            New Request <ArrowRight className="ml-2 w-4 h-4" />
+            New Request
           </button>
-          <a 
+          <a
             href={`https://stellar.expert/explorer/testnet/tx/${requestId}`}
             target="_blank"
             rel="noopener noreferrer"

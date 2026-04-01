@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchTransactionStatus, getExplorerUrl, TxStatus } from '../../services/transactionService';
-import { useToast } from '../../../app/context/ToastContext';
+import { useToast } from '../../app/context/ToastContext';
 
 export interface TransactionTrackerProps {
   hash: string;
