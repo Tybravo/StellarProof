@@ -7,6 +7,8 @@ import { WalletModal } from "./WalletModal";
 import ThemeToggle from "./ThemeToggle";
 import NetworkBadge from "./wallet/NetworkBadge";
 import WrongNetworkWarning from "./wallet/WrongNetworkWarning";
+import { useAuth } from "@/app/context/AuthContext";
+import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "#home", label: "Home" },
@@ -73,6 +75,7 @@ function LogoIcon() {
 }
 
 export default function Header() {
+  const { isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [mobileDropdown, setMobileDropdown] = useState<string | null>(null);
@@ -218,7 +221,24 @@ export default function Header() {
           <NetworkBadge />
           <ThemeToggle />
           <div className="hidden sm:block">
-            <WalletModal />
+            {!isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-white transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg shadow-button-glow hover:shadow-glow transition-all"
+                >
+                  Register
+                </Link>
+              </div>
+            ) : (
+              <WalletModal />
+            )}
           </div>
           <button
             type="button"
@@ -312,7 +332,26 @@ export default function Header() {
                 )}
               </ul>
               <div className="mt-4 border-t border-gray-200 dark:border-white/10 pt-4 px-4 w-full">
-                <WalletModal />
+                {!isAuthenticated ? (
+                  <div className="flex flex-col gap-2">
+                    <Link
+                      href="/login"
+                      onClick={() => setMobileOpen(false)}
+                      className="w-full text-center px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-white/90 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-lg transition-colors"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setMobileOpen(false)}
+                      className="w-full text-center px-4 py-2.5 text-sm font-semibold bg-primary text-white rounded-lg shadow-button-glow hover:shadow-glow transition-all"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                ) : (
+                  <WalletModal />
+                )}
               </div>
             </nav>
           </motion.div>

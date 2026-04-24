@@ -24,6 +24,7 @@ export function WalletModal() {
     connect,
     clearError,
   } = useWallet();
+  const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +53,7 @@ export function WalletModal() {
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-controls="wallet-menu"
-        aria-label={isConnecting ? "Connecting wallet" : "Launch App, open wallet menu"}
+        aria-label={isConnecting ? "Connecting wallet" : "Launch Wallet, open wallet menu"}
         className={`${btnBase} bg-primary text-white shadow-button-glow hover:shadow-glow`}
       >
         {isConnecting ? (
@@ -62,7 +63,7 @@ export function WalletModal() {
           </>
         ) : (
           <>
-            Launch App
+            Launch Wallet
             <ChevronDown
               className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
               aria-hidden="true"
@@ -83,28 +84,37 @@ export function WalletModal() {
             transition={{ duration: 0.2 }}
             className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-darkblue/95 p-1 shadow-lg backdrop-blur-md z-50"
           >
-            <button
-              role="menuitem"
-              onClick={() => {
-                connect();
-                setIsOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset"
-            >
-              <Wallet className="h-4 w-4" aria-hidden="true" />
-              Connect Wallet
-            </button>
-            <a
-              role="menuitem"
-              href={FREIGHTER_INSTALL_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset"
-              onClick={() => setIsOpen(false)}
-            >
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              Install Freighter
-            </a>
+            {!isAuthenticated ? (
+              <div className="p-4 text-sm text-center text-white/90">
+                <Lock className="h-8 w-8 mx-auto mb-2 text-white/50" />
+                <p>Please log in to connect your wallet</p>
+              </div>
+            ) : (
+              <>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    connect();
+                    setIsOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset"
+                >
+                  <Wallet className="h-4 w-4" aria-hidden="true" />
+                  Connect Wallet
+                </button>
+                <a
+                  role="menuitem"
+                  href={FREIGHTER_INSTALL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  Install Freighter
+                </a>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
