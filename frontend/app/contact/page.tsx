@@ -75,7 +75,8 @@ export default function ContactPage() {
     setValue,
     watch,
   } = useForm<ContactFormInputs>({
-    resolver: zodResolver(contactSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(contactSchema as any),
     mode: "onBlur",
     defaultValues: {
       fullName: "",

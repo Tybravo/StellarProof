@@ -10,6 +10,7 @@ import manifestRoutes from "./manifest.routes";
 import developerRoutes from "./developer.routes";
 import authRoutes from "./auth.routes";
 import userRoutes from "./user.routes";
+import ipfsRoutes from "./ipfs.routes";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/api/v1/verification/jobs", verificationRoutes);
 router.use("/api/v1/developer", developerRoutes);
 router.use("/api/v1/auth", authRoutes);
 router.use("/api/v1/users", userRoutes);
+router.use("/api/v1/ipfs", ipfsRoutes);
 
 export default router;

@@ -55,4 +55,10 @@ export const env = {
 
   /** JWT expiry duration, e.g. '7d', '24h' */
   JWT_EXPIRES_IN: optionalEnv("JWT_EXPIRES_IN", "7d"),
+
+  /** Pinata JWT for IPFS uploads (v3 API) */
+  PINATA_JWT: requireEnv("PINATA_JWT"),
+
+  /** Pinata public gateway base URL */
+  PINATA_GATEWAY_URL: optionalEnv("PINATA_GATEWAY_URL", "https://gateway.pinata.cloud/ipfs"),
 } as const;

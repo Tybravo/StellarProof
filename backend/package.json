@@ -26,6 +26,7 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.1",
+    "pinata": "^2.5.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
