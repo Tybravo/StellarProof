@@ -10,7 +10,7 @@ import { WizardProvider } from "../context/WizardContext";
 import { ToastProvider } from "../context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import QueryProvider from "../context/QueryProvider";
-
+ 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

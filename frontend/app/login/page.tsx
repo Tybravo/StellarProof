@@ -5,22 +5,14 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/context/WalletContext";
 import { useWizard } from "@/context/WizardContext";
-
-const authService = {
-  login: async (email: string, password: string): Promise<{ token: string }> => {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    if (email === "test@stellarproof.com" && password === "password123") {
-      return { token: "mock_token_xyz" };
-    }
-    throw new Error("Invalid credentials");
-  },
-};
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const { addToast } = useToast();
   const { disconnect } = useWallet();
   const { reset } = useWizard();
+  const { login, logout } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,10 +41,7 @@ export default function LoginPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("session_token");
-    sessionStorage.removeItem("session_token");
-    localStorage.removeItem("freighter_public_key");
-    localStorage.removeItem("walletConnected");
+    logout();
     disconnect();
     reset();
     addToast({ type: "success", message: "You have been logged out successfully" });
@@ -70,12 +59,7 @@ export default function LoginPage() {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) return;
     setIsLoading(true);
     try {
-      const { token } = await authService.login(email, password);
-      if (rememberMe) {
-        localStorage.setItem("session_token", token);
-      } else {
-        sessionStorage.setItem("session_token", token);
-      }
+      await login(email, password);
       addToast({ type: "success", message: "Welcome back!" });
       router.push("/dashboard");
     } catch {

@@ -7,6 +7,8 @@ import { WalletModal } from "./WalletModal";
 import ThemeToggle from "./ThemeToggle";
 import NetworkBadge from "./wallet/NetworkBadge";
 import WrongNetworkWarning from "./wallet/WrongNetworkWarning";
+import { useAuth } from "@/app/context/AuthContext";
+import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "#home", label: "Home" },

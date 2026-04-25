@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/context/ToastContext";
-import { authService } from "@/services/auth";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface RegisterFormValues {
   fullName: string;
@@ -32,6 +32,7 @@ function getPasswordStrength(password: string) {
 export default function RegisterPage() {
   const router = useRouter();
   const { addToast } = useToast();
+  const { register: registerAuth } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,18 +52,9 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
     try {
-      const result = await authService.register({
-        fullName: data.fullName,
-        email: data.email,
-        password: data.password,
-      });
-
-      if (result.success) {
-        addToast({ type: "success", message: result.message });
-        router.push("/dashboard");
-      } else {
-        addToast({ type: "error", message: result.message });
-      }
+      await registerAuth(data.fullName, data.email, data.password);
+      addToast({ type: "success", message: "Registration successful" });
+      router.push("/dashboard");
     } catch {
       addToast({
         type: "error",

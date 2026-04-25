@@ -6,8 +6,10 @@ import {
   Loader2,
   ChevronDown,
   Wallet,
+  Lock,
 } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
+import { useAuth } from "@/app/context/AuthContext";
 import { FREIGHTER_INSTALL_URL } from "@/services/wallet";
 import { motion, AnimatePresence } from "framer-motion";
 import { AccountDropdown } from "@/components/wallet/AccountDropdown";
