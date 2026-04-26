@@ -12,14 +12,13 @@ export function initCloudinary(): void {
     );
   }
 
-  const config: ConfigOptions = {
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
-    secure: true,
-  };
+  cloudinary.config({
+    cloud_name: env.CLOUDINARY_CLOUD_NAME,
+    api_key: env.CLOUDINARY_API_KEY,
+    api_secret: env.CLOUDINARY_API_SECRET,
+  });
 
-  cloudinary.config(config);
-}
+  console.log("[Config] Cloudinary initialized successfully");
+};
 
 export { cloudinary };

@@ -84,6 +84,52 @@ export const uploadEncryptedAsset = async (req: Request, res: Response): Promise
   }
 };
 
+export const getUserSPVRecords = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const records = await spvService.getUserSPVRecords(
+      new mongoose.Types.ObjectId(req.user!.id),
+    );
+    res.status(200).json({ success: true, data: records });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const updateSealedStatus = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { isSealed } = req.body;
+
+  if (typeof isSealed !== 'boolean') {
+    res.status(400).json({
+      success: false,
+      message: 'isSealed must be a boolean value.',
+    });
+    return;
+  }
+
+  try {
+    const record = await spvService.updateSealedStatus(
+      id,
+      isSealed,
+      new mongoose.Types.ObjectId(req.user!.id),
+    );
+
+    if (!record) {
+      res.status(404).json({
+        success: false,
+        message: 'SPV record not found or you do not have permission to update it.',
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: record });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+    res.status(500).json({ success: false, message });
+  }
+};
+
 export const getSPVRecord = async (req: Request, res: Response): Promise<void> => {
   const { spvId } = req.params;
 

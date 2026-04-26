@@ -23,9 +23,16 @@ export default function LoginPage() {
     router.push("/login");
   };
 
-  if (typeof window !== "undefined") {
-    (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout = handleLogout;
-  }
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout = handleLogout;
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        delete (window as any).__stellarproof_logout;
+      }
+    };
+  }, [handleLogout]);
 
   return (
     <main id="main-content" className="min-h-screen flex items-center justify-center bg-darkblue dark:bg-darkblue-dark px-4">

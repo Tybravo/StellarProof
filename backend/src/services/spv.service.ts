@@ -97,8 +97,9 @@ class SPVService {
         creatorId: params.creatorId,
         keyVersion: 'v1',
         algorithm: 'AES-256-GCM',
-        encryptedKeyValue,
+        encryptedKeyValue: wrappedKey.toString('base64'),
         iv: keyIv.toString('hex'),
+        authTag: keyAuthTag.toString('hex'),
         isActive: true,
       });
 
