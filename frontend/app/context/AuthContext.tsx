@@ -27,8 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(storedAuth);
         if (parsed.isAuthenticated && parsed.user) {
-          setIsAuthenticated(parsed.isAuthenticated);
-          setUser(parsed.user);
+          Promise.resolve().then(() => {
+            setIsAuthenticated(parsed.isAuthenticated);
+            setUser(parsed.user);
+          });
         }
       } catch (e) {
         console.error("Failed to parse auth from localStorage", e);

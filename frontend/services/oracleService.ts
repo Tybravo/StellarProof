@@ -2,7 +2,7 @@
 export type VerificationStatus = 'Pending' | 'Verified' | 'Rejected';
 
 // Simulating a Soroban RPC call
-export const fetchOracleStatus = async (_requestId: string): Promise<VerificationStatus> => {  await new Promise((resolve) => setTimeout(resolve, 800));
+export const fetchOracleStatus = async (): Promise<VerificationStatus> => {  await new Promise((resolve) => setTimeout(resolve, 800));
 
   const random = Math.random();
   if (random > 0.8) return 'Verified';
