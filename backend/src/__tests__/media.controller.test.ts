@@ -34,71 +34,84 @@ import { StatusCodes } from "http-status-codes";
 describe("MediaController", () => {
   let req: Partial<Request>;
   let res: Partial<Response>;
-  let jsonMock: jest.Mock;
-  let statusMock: jest.Mock;
+  let next: jest.Mock;
 
   beforeEach(() => {
-    jsonMock = jest.fn();
-    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
-    res = {
-      status: statusMock,
-    };
     req = {
-      user: { id: "user-id" } as any,
+      file: {
+        buffer: Buffer.from("test content"),
+        originalname: "test-image.jpg",
+        mimetype: "image/jpeg",
+        size: 1024,
+      } as any,
+      user: { id: "user-123" } as any,
     };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
     jest.clearAllMocks();
   });
 
-  describe("uploadMedia", () => {
-    it("should upload media and save to database successfully", async () => {
-      req.file = {
-        buffer: Buffer.from("test"),
-        originalname: "test.jpg",
-        mimetype: "image/jpeg",
-        size: 100,
-      } as any;
+  it("successfully uploads media, saves to DB, and returns retrieved data", async () => {
+    const mockCloudinaryResult = {
+      secure_url: "https://res.cloudinary.com/demo/image/upload/v1/test.jpg",
+      public_id: "test_id",
+    };
 
-      const mockCloudinaryResult = {
-        secure_url: "https://cloudinary.com/test.jpg",
-        public_id: "test_id",
-      };
+    const mockSavedAsset = {
+      _id: "asset-999",
+      fileName: "test-image.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 1024,
+      storageReferenceId: "https://res.cloudinary.com/demo/image/upload/v1/test.jpg",
+      createdAt: new Date(),
+    };
 
-      const mockAsset = {
-        _id: "asset-id",
-        creatorId: "user-id",
-        fileName: "test.jpg",
-        storageProvider: "cloudinary",
-        storageReferenceId: "test_id",
-      };
+    (cloudinaryService.uploadBuffer as jest.Mock).mockResolvedValue(mockCloudinaryResult);
+    (assetService.createAsset as jest.Mock).mockResolvedValue({ _id: "asset-999" });
+    (assetService.getAssetById as jest.Mock).mockResolvedValue(mockSavedAsset);
 
-      (cloudinaryService.uploadBuffer as jest.Mock).mockResolvedValue(mockCloudinaryResult);
-      (assetService.createAsset as jest.Mock).mockResolvedValue(mockAsset);
-      (assetService.getAssetById as jest.Mock).mockResolvedValue(mockAsset);
+    await mediaController.uploadMedia(req as Request, res as Response, next);
 
-      await mediaController.uploadMedia(req as Request, res as Response);
-
-      expect(statusMock).toHaveBeenCalledWith(StatusCodes.CREATED);
-      expect(jsonMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining({
-            assetId: "asset-id",
-            url: "https://cloudinary.com/test.jpg",
-          }),
-        })
-      );
+    expect(cloudinaryService.uploadBuffer).toHaveBeenCalledWith(req.file?.buffer);
+    expect(assetService.createAsset).toHaveBeenCalledWith(expect.objectContaining({
+      creatorId: "user-123",
+      fileName: "test-image.jpg",
+      storageProvider: "cloudinary",
+      storageReferenceId: mockCloudinaryResult.secure_url,
+    }));
+    expect(assetService.getAssetById).toHaveBeenCalledWith("asset-999");
+    
+    expect(res.status).toHaveBeenCalledWith(StatusCodes.CREATED);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Media uploaded and saved successfully",
+      data: expect.objectContaining({
+        assetId: "asset-999",
+        url: mockCloudinaryResult.secure_url,
+      }),
     });
+  });
 
-    it("should return 400 if no file is provided", async () => {
-      await mediaController.uploadMedia(req as Request, res as Response);
+  it("throws error if no file is provided", async () => {
+    req.file = undefined;
 
-      expect(statusMock).toHaveBeenCalledWith(StatusCodes.BAD_REQUEST);
-      expect(jsonMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: false,
-          message: "No file uploaded",
-        })
-      );
-    });
+    await mediaController.uploadMedia(req as Request, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: StatusCodes.BAD_REQUEST,
+      code: "NO_FILE_PROVIDED",
+    }));
+  });
+
+  it("handles service errors gracefully", async () => {
+    const error = new Error("Upload failed");
+    (cloudinaryService.uploadBuffer as jest.Mock).mockRejectedValue(error);
+
+    await mediaController.uploadMedia(req as Request, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(error);
   });
 });

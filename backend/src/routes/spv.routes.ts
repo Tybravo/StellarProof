@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-// Configure multer for memory storage (file buffer)
+// Store uploads in memory so the service receives a Buffer directly
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -26,20 +26,20 @@ router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
 
 /**
  * GET /api/v1/spv/records/user
- * Get all SPV records for the current user
+ * Get all SPV records for the authenticated user
  */
 router.get('/records/user', protect, getUserSPVRecords);
-
-/**
- * PATCH /api/v1/spv/records/:id/seal
- * Update the sealed status of an SPV record
- */
-router.patch('/records/:id/seal', protect, updateSealedStatus);
 
 /**
  * GET /api/v1/spv/:spvId
  * Get SPV record by ID
  */
 router.get('/:spvId', protect, getSPVRecord);
+
+/**
+ * GET /api/v1/spv/:spvId
+ * Get SPV record by ID
+ */
+router.patch('/records/:id/seal', protect, updateSealedStatus);
 
 export default router;

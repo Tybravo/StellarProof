@@ -21,14 +21,15 @@ class IpfsService {
       let file: File;
 
       if (Buffer.isBuffer(content)) {
-        // Use Uint8Array to avoid Buffer typing conflicts with BlobPart
+        // Use Uint8Array to satisfy BlobPart requirement and avoid SharedArrayBuffer issues
         file = new File([new Uint8Array(content)], name, { type: "application/octet-stream" });
       } else {
         const json = JSON.stringify(content);
         file = new File([json], `${name}.json`, { type: "application/json" });
       }
 
-      // Pinata SDK v2 uses a builder pattern. Casting to any to avoid TS errors if types are mismatched.
+      // In Pinata SDK v3, metadata is often handled via the builder or options
+      // Casting to any to bypass the specific builder type issue if addMetadata is known to work at runtime
       const response = await (this.pinata.upload.public.file(file) as any).addMetadata({
         name,
         keyValues: metadata,

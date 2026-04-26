@@ -36,4 +36,15 @@ describe("Upload Middleware File Filter", () => {
       })
     );
   });
+
+  it("should reject executable files (application/x-msdownload)", () => {
+    const mockFile = { mimetype: "application/x-msdownload" } as any;
+    (uploadMiddleware as any).fileFilter({} as any, mockFile, mockCb);
+    
+    expect(mockCb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "INVALID_FILE_TYPE",
+      })
+    );
+  });
 });

@@ -1,52 +1,62 @@
 import { cloudinary } from "../config/cloudinary";
-import { Readable } from "stream";
-import { CloudinaryUploadResult } from "../types/cloudinary.types";
 import { AppError } from "../errors/AppError";
 import { StatusCodes } from "http-status-codes";
+import type { CloudinaryUploadResult } from "../types/cloudinary.types";
+import { UploadApiResponse } from "cloudinary";
 
 class CloudinaryService {
   /**
-   * Upload a file buffer to Cloudinary using upload_stream.
-   * @param buffer The file buffer to upload.
-   * @param fileName Original file name for reference.
-   * @returns The Cloudinary upload result.
+   * Uploads a file buffer to Cloudinary using upload stream.
+   * 
+   * @param buffer - File buffer to upload
+   * @param folder - Cloudinary folder name
+   * @returns Promise<CloudinaryUploadResult>
    */
-  async uploadBuffer(buffer: Buffer, fileName: string): Promise<CloudinaryUploadResult> {
+  async uploadBuffer(
+    buffer: Buffer,
+    folder: string = "stellarproof"
+  ): Promise<CloudinaryUploadResult> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "stellarproof/media",
-          public_id: `${Date.now()}-${fileName.split(".")[0]}`,
-          resource_type: "auto",
-        },
+        { folder, resource_type: "auto" },
         (error, result) => {
           if (error) {
             return reject(
               new AppError(
                 `Cloudinary upload failed: ${error.message}`,
                 StatusCodes.INTERNAL_SERVER_ERROR,
-                "CLOUDINARY_UPLOAD_ERROR"
+                "CLOUDINARY_UPLOAD_FAILED"
               )
             );
           }
+
           if (!result) {
             return reject(
               new AppError(
                 "Cloudinary upload failed: No result returned",
                 StatusCodes.INTERNAL_SERVER_ERROR,
-                "CLOUDINARY_UPLOAD_ERROR"
+                "CLOUDINARY_UPLOAD_FAILED"
               )
             );
           }
-          resolve(result as CloudinaryUploadResult);
+
+          const uploadResult = result as UploadApiResponse;
+
+          resolve({
+            secure_url: uploadResult.secure_url,
+            public_id: uploadResult.public_id,
+            format: uploadResult.format,
+            resource_type: uploadResult.resource_type,
+            bytes: uploadResult.bytes,
+            width: uploadResult.width,
+            height: uploadResult.height,
+            folder: uploadResult.folder,
+            created_at: uploadResult.created_at,
+          });
         }
       );
 
-      // Create a readable stream from the buffer and pipe it to the upload stream
-      const readableStream = new Readable();
-      readableStream.push(buffer);
-      readableStream.push(null);
-      readableStream.pipe(uploadStream);
+      uploadStream.end(buffer);
     });
   }
 }

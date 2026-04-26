@@ -1,18 +1,17 @@
 import { Router } from "express";
 import { mediaController } from "../controllers/media.controller";
 import { uploadMiddleware } from "../middlewares/upload.middleware";
-import { protect } from "../middlewares/auth.middleware";
 
 const router = Router();
 
 /**
  * POST /api/v1/media/upload
  * Upload a media file to Cloudinary.
- * Requires Authentication.
+ * Accepts multipart/form-data with a single 'file' field.
+ * Returns the secure URL and DB record metadata.
  */
 router.post(
   "/upload",
-  protect,
   uploadMiddleware.single("file"),
   mediaController.uploadMedia.bind(mediaController)
 );

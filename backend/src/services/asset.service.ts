@@ -3,26 +3,29 @@ import mongoose from "mongoose";
 
 class AssetService {
   /**
-   * Create a new asset record in the database.
+   * Creates a new asset record in the database.
    */
-  async createAsset(data: Partial<IAsset>): Promise<IAsset> {
-    const asset = new Asset(data);
+  async createAsset(data: {
+    creatorId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    storageProvider: "mongodb" | "ipfs" | "s3" | "cloudinary";
+    storageReferenceId: string;
+    isEncrypted?: boolean;
+  }): Promise<IAsset> {
+    const asset = new Asset({
+      ...data,
+      creatorId: new mongoose.Types.ObjectId(data.creatorId),
+    });
     return await asset.save();
   }
 
   /**
-   * Get an asset by ID.
+   * Retrieves an asset by its ID.
    */
   async getAssetById(id: string): Promise<IAsset | null> {
-    if (!mongoose.Types.ObjectId.isValid(id)) return null;
-    return await Asset.findById(id).exec();
-  }
-
-  /**
-   * Get all assets for a user.
-   */
-  async getAssetsByUser(userId: string): Promise<IAsset[]> {
-    return await Asset.find({ creatorId: userId }).sort({ createdAt: -1 }).exec();
+    return await Asset.findById(id);
   }
 }
 

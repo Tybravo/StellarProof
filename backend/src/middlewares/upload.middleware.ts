@@ -40,6 +40,7 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
 
 /**
  * Multer middleware configuration.
+ * Uses memory storage for fast Web2 retrieval and Cloudinary streaming.
  */
 export const uploadMiddleware = multer({
   storage: multer.memoryStorage(),
