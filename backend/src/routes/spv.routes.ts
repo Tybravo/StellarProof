@@ -1,21 +1,11 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect } from '../middlewares/auth.middleware';
-import { uploadEncryptedAsset, getSPVRecord } from '../controllers/spv.controller';
-
-const router = Router();
-
-// Store uploads in memory so the service receives a Buffer directly
-const upload = multer({ storage: multer.memoryStorage() });
-
-router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
-router.get('/:spvId', protect, getSPVRecord);
-import { handleSPVUpload } from '../middlewares/spv.middleware';
 import {
   uploadEncryptedAsset,
   getSPVRecord,
   getUserSPVRecords,
-  updateSealedStatus
+  updateSealedStatus,
 } from '../controllers/spv.controller';
 
 const router = Router();
@@ -24,33 +14,32 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  }
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
 });
 
 /**
  * POST /api/v1/spv/upload
  * Upload a file with SPV encryption
- * Middleware chain: multer -> SPV middleware -> controller
  */
-router.post('/upload', upload.single('file'), handleSPVUpload, uploadEncryptedAsset);
+router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
 
 /**
- * GET /api/v1/spv/records/:assetId
- * Get SPV record by asset ID
+ * GET /api/v1/spv/records/user
+ * Get all SPV records for the current user
  */
-router.get('/records/:assetId', getSPVRecord);
-
-/**
- * GET /api/v1/spv/records/user/:userId
- * Get all SPV records for a user
- */
-router.get('/records/user/:userId', getUserSPVRecords);
+router.get('/records/user', protect, getUserSPVRecords);
 
 /**
  * PATCH /api/v1/spv/records/:id/seal
  * Update the sealed status of an SPV record
  */
-router.patch('/records/:id/seal', updateSealedStatus);
+router.patch('/records/:id/seal', protect, updateSealedStatus);
+
+/**
+ * GET /api/v1/spv/:spvId
+ * Get SPV record by ID
+ */
+router.get('/:spvId', protect, getSPVRecord);
 
 export default router;

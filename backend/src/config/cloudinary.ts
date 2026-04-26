@@ -1,25 +1,23 @@
-import { v2 as cloudinary, ConfigOptions } from 'cloudinary';
+import { v2 as cloudinary } from "cloudinary";
+import { env } from "./env";
 
-
-export function initCloudinary(): void {
-  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } =
-    process.env;
-
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error(
-      'Missing required Cloudinary environment variables: ' +
-        'CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET',
-    );
+/**
+ * Initialize Cloudinary SDK with environment variables.
+ * This is called at server startup.
+ */
+export const initCloudinary = (): void => {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    console.warn("[Config] Cloudinary credentials missing. Media uploads will fail.");
+    return;
   }
 
-  const config: ConfigOptions = {
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
-    secure: true,
-  };
+  cloudinary.config({
+    cloud_name: env.CLOUDINARY_CLOUD_NAME,
+    api_key: env.CLOUDINARY_API_KEY,
+    api_secret: env.CLOUDINARY_API_SECRET,
+  });
 
-  cloudinary.config(config);
-}
+  console.log("[Config] Cloudinary initialized successfully");
+};
 
 export { cloudinary };

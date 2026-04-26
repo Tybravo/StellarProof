@@ -61,4 +61,9 @@ export const env = {
 
   /** Pinata public gateway base URL */
   PINATA_GATEWAY_URL: optionalEnv("PINATA_GATEWAY_URL", "https://gateway.pinata.cloud/ipfs"),
+
+  /** Cloudinary Configuration */
+  CLOUDINARY_CLOUD_NAME: optionalEnv("CLOUDINARY_CLOUD_NAME", ""),
+  CLOUDINARY_API_KEY: optionalEnv("CLOUDINARY_API_KEY", ""),
+  CLOUDINARY_API_SECRET: optionalEnv("CLOUDINARY_API_SECRET", ""),
 } as const;

@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 export interface CleanedAsset {
   assetId: mongoose.Types.ObjectId;
   storageReferenceId: string;
-  storageProvider: 'mongodb' | 'ipfs' | 's3';
+  storageProvider: 'mongodb' | 'ipfs' | 's3' | 'cloudinary';
   remoteDeleteSuccess: boolean;
 }
 

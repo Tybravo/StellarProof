@@ -21,13 +21,15 @@ class IpfsService {
       let file: File;
 
       if (Buffer.isBuffer(content)) {
-        file = new File([content], name, { type: "application/octet-stream" });
+        // Use Uint8Array to avoid Buffer typing conflicts with BlobPart
+        file = new File([new Uint8Array(content)], name, { type: "application/octet-stream" });
       } else {
         const json = JSON.stringify(content);
         file = new File([json], `${name}.json`, { type: "application/json" });
       }
 
-      const response = await this.pinata.upload.public.file(file).addMetadata({
+      // Pinata SDK v2 uses a builder pattern. Casting to any to avoid TS errors if types are mismatched.
+      const response = await (this.pinata.upload.public.file(file) as any).addMetadata({
         name,
         keyValues: metadata,
       });
