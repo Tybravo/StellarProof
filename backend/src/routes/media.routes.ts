@@ -1,14 +1,8 @@
 import { Router } from "express";
-import multer from "multer";
 import { mediaController } from "../controllers/media.controller";
+import { uploadMiddleware } from "../middlewares/upload.middleware";
 
 const router = Router();
-
-// Configure multer for memory storage
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
-});
 
 /**
  * POST /api/v1/media/upload
@@ -18,7 +12,7 @@ const upload = multer({
  */
 router.post(
   "/upload",
-  upload.single("file"),
+  uploadMiddleware.single("file"),
   mediaController.uploadMedia.bind(mediaController)
 );
 

@@ -1,16 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect } from '../middlewares/auth.middleware';
-import { uploadEncryptedAsset, getSPVRecord } from '../controllers/spv.controller';
-
-const router = Router();
-
-// Store uploads in memory so the service receives a Buffer directly
-const upload = multer({ storage: multer.memoryStorage() });
-
-router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
-router.get('/:spvId', protect, getSPVRecord);
-import { handleSPVUpload } from '../middlewares/spv.middleware';
 import {
   uploadEncryptedAsset,
   getSPVRecord,
@@ -20,7 +10,7 @@ import {
 
 const router = Router();
 
-// Configure multer for memory storage (file buffer)
+// Store uploads in memory so the service receives a Buffer directly
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -31,26 +21,25 @@ const upload = multer({
 /**
  * POST /api/v1/spv/upload
  * Upload a file with SPV encryption
- * Middleware chain: multer -> SPV middleware -> controller
  */
-router.post('/upload', upload.single('file'), handleSPVUpload, uploadEncryptedAsset);
+router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
 
 /**
- * GET /api/v1/spv/records/:assetId
- * Get SPV record by asset ID
+ * GET /api/v1/spv/records/user
+ * Get all SPV records for the authenticated user
  */
-router.get('/records/:assetId', getSPVRecord);
+router.get('/records/user', protect, getUserSPVRecords);
 
 /**
- * GET /api/v1/spv/records/user/:userId
- * Get all SPV records for a user
+ * GET /api/v1/spv/:spvId
+ * Get SPV record by ID
  */
-router.get('/records/user/:userId', getUserSPVRecords);
+router.get('/:spvId', protect, getSPVRecord);
 
 /**
  * PATCH /api/v1/spv/records/:id/seal
  * Update the sealed status of an SPV record
  */
-router.patch('/records/:id/seal', updateSealedStatus);
+router.patch('/records/:id/seal', protect, updateSealedStatus);
 
 export default router;
