@@ -124,12 +124,23 @@ class SPVService {
         isSealed: true,
       });
 
+<<<<<<< HEAD
       return {
         spvRecord,
         asset,
         storageUrl,
         storageReferenceId,
       };
+=======
+    return {
+  spvRecord,
+  asset,
+  cloudinaryUrl: cloudinaryResult.secure_url,
+  cloudinaryPublicId: cloudinaryResult.public_id,
+  storageUrl: cloudinaryResult.secure_url,
+  storageReferenceId: cloudinaryResult.public_id,
+};
+>>>>>>> ce4f16e (feat(testing): setup Jest and Supertest testing environment)
     } catch (dbError) {
       if (params.storageProvider === 'cloudinary' && storageReferenceId) {
         await cloudinary.uploader
@@ -208,6 +219,7 @@ class SPVService {
     });
   }
 }
+<<<<<<< HEAD
 
 /**
  * Encrypts a file buffer using the user's active KMS key
@@ -246,3 +258,9 @@ export async function encryptFileForSPV(
 }
 
 export const spvService = new SPVService();
+=======
+export const spvService = new SPVService();
+export type SupportedStorageProvider = 'cloudinary' | 'ipfs' | 's3' | 'mongodb';
+>>>>>>> ce4f16e (feat(testing): setup Jest and Supertest testing environment)
+
+

@@ -44,26 +44,14 @@ export const handleSPVUpload = async (
       return;
     }
 
-    // Encrypt the file buffer using KMS service
-    const encryptedData = await spvService.encryptFileForSPV(
-      req.file.buffer,
-      req.body.userId
-    );
-
-    // Attach encrypted data to request for downstream processing
+   // Attach raw file data — encryption is handled by spvService.uploadEncryptedAsset
     req.body.encryptedFile = {
-      buffer: encryptedData.encryptedBuffer,
-      iv: encryptedData.iv,
-      authTag: encryptedData.authTag,
-      keyVersion: encryptedData.keyVersion,
+      buffer: req.file.buffer,
       originalFileName: req.file.originalname,
       mimeType: req.file.mimetype,
-      size: req.file.size
+      size: req.file.size,
     };
-
-    // Mark that encryption has been applied
-    req.body.isEncrypted = true;
-
+    req.body.isEncrypted = false;
     next();
   } catch (error: any) {
     console.error('Error in SPV middleware:', error);
