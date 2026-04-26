@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.model';
+import User, { IUser } from '../models/User.model';
 import { AppError } from '../errors/AppError';
 import { env } from '../config/env';
 
@@ -10,6 +10,22 @@ export interface LoginResult {
     email: string;
     role: string;
     stellarPublicKey?: string;
+  };
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  role?: 'creator' | 'developer';
+}
+
+export interface RegisterResult {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    createdAt: Date;
   };
 }
 
@@ -53,9 +69,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * ✅ NEW METHOD (fixes your CI error)
-   */
   async verifyTokenAndGetUser(token: string) {
     if (!token) {
       throw new AppError('No token provided', 401, 'NO_TOKEN');
@@ -81,6 +94,42 @@ export class AuthService {
 
     return user;
   }
+
+  /**
+   * Registers a new user account.
+   *
+   * Checks for duplicate email, then creates the user. The User model
+   * pre-save hook hashes the password automatically before persisting.
+   */
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    const { email, password, role } = input;
+
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existingUser) {
+      throw new AppError('An account with this email already exists.', 409, 'EMAIL_TAKEN');
+    }
+
+    const user: IUser = new User({
+      email,
+      passwordHash: password,
+      role: role ?? 'creator',
+    });
+
+    await user.save();
+
+    return {
+      user: {
+        id: (user._id as any).toString(),
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+      },
+    };
+  }
 }
 
 export const authService = new AuthService();
+
+// Standalone helper for direct imports
+export const registerUser = (input: RegisterInput) => authService.register(input);
