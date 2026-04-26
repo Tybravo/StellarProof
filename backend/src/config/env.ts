@@ -56,6 +56,15 @@ export const env = {
   /** JWT expiry duration, e.g. '7d', '24h' */
   JWT_EXPIRES_IN: optionalEnv("JWT_EXPIRES_IN", "7d"),
 
+  /** Cloudinary Cloud Name */
+  CLOUDINARY_CLOUD_NAME: optionalEnv("CLOUDINARY_CLOUD_NAME", ""),
+
+  /** Cloudinary API Key */
+  CLOUDINARY_API_KEY: optionalEnv("CLOUDINARY_API_KEY", ""),
+
+  /** Cloudinary API Secret */
+  CLOUDINARY_API_SECRET: optionalEnv("CLOUDINARY_API_SECRET", ""),
+
   /** Pinata JWT for IPFS uploads (v3 API) */
   PINATA_JWT: requireEnv("PINATA_JWT"),
 
