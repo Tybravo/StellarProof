@@ -32,8 +32,9 @@ function getInitialAuth(): { isAuthenticated: boolean; user: User | null } {
     } catch (e) {
       console.error("Failed to parse auth from localStorage", e);
     }
-    return null;
-  });
+  }
+  return { isAuthenticated: false, user: null };
+}
 
   const login = async (email: string, password: string): Promise<void> => {
     return new Promise((resolve, reject) => {
