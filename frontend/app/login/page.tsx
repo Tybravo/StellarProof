@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/context/WalletContext";
@@ -22,15 +22,6 @@ export default function LoginPage() {
     addToast({ type: "success", message: "You have been logged out successfully" });
     router.push("/login");
   };
-
-  useEffect(() => {
-    // Expose logout handler to window for external calls
-    (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout = handleLogout;
-    return () => {
-      // Cleanup on unmount
-      delete (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout;
-    };
-  }, [handleLogout]);
 
   return (
     <main id="main-content" className="min-h-screen flex items-center justify-center bg-darkblue dark:bg-darkblue-dark px-4">
