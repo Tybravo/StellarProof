@@ -9,8 +9,9 @@ import { WalletProvider } from "../context/WalletContext";
 import { WizardProvider } from "../context/WizardContext";
 import { ToastProvider } from "../context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { AuthProvider } from "./context/AuthContext";
 import QueryProvider from "../context/QueryProvider";
-
+ 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -80,10 +81,12 @@ export default function RootLayout({
             <WalletProvider>
               <WizardProvider>
                 <QueryProvider>
-                  {children}
-                  <Footer />
-                  <ScrollToTop />
-                  <DebugPanel />
+                  <AuthProvider>
+                    {children}
+                    <Footer />
+                    <ScrollToTop />
+                    <DebugPanel />
+                  </AuthProvider>
                 </QueryProvider>
               </WizardProvider>
             </WalletProvider>

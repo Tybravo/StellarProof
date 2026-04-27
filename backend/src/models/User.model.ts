@@ -15,14 +15,13 @@ export interface IUser extends Document {
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
 
-  stellarPublicKey?: string;   // Added later when they connect Freighter wallet
-  nonce?: string;              // For SIWE (Sign-In With Ethereum/Stellar) flow if needed later
+  stellarPublicKey?: string;
+  nonce?: string;
   role: 'creator' | 'developer' | 'admin';
-  apiKeys: string[];           // For developer API access (Phase 2)
+  apiKeys: string[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -34,7 +33,10 @@ const UserSchema: Schema = new Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address'],
+      match: [
+        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        'Please provide a valid email address',
+      ],
     },
     passwordHash: {
       type: String,
@@ -69,17 +71,23 @@ const UserSchema: Schema = new Schema(
     isActive: {
       type: Boolean,
       default: true,
-    }
+    },
   },
   { timestamps: true }
 );
 
+// ── Pre-save hook: hash password before persisting ──────────────────────────
 UserSchema.pre<IUser>('save', async function (next) {
   if (!this.isModified('passwordHash')) return next();
-  this.passwordHash = await bcrypt.hash(this.passwordHash, BCRYPT_SALT_ROUNDS);
-  next();
+  try {
+    this.passwordHash = await bcrypt.hash(this.passwordHash, BCRYPT_SALT_ROUNDS);
+    return next();
+  } catch (err: any) {
+    return next(err);
+  }
 });
 
+// ── Instance method: verify a plain-text password against the stored hash ───
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {

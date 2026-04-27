@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { X, FileText, CheckCircle } from "lucide-react";
+import { X, FileText, CheckCircle, Plus, Minus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ManifestUseCase } from "@/services/manifestUseCases";
-import KeyValueBuilder from "@/components/KeyValueBuilder";
-import {
-  type ManifestKeyRow,
-  useDuplicateKeyValidation,
-} from "@/utils/manifestValidation";
+import { useDuplicateKeyValidation } from "@/utils/manifestValidation";
+
+type KeyValuePair = {
+  key: string;
+  value: string;
+};
 
 interface Props {
   open: boolean;
@@ -19,68 +20,76 @@ interface Props {
 }
 
 export default function ManifestGeneratorModal({ open, useCase, onClose, onGenerated }: Props) {
-  const [rows, setRows] = useState<ManifestKeyRow[]>([]);
+  const [pairs, setPairs] = useState<KeyValuePair[]>([{ key: "", value: "" }]);
   const [submitted, setSubmitted] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [manifestData, setManifestData] = useState<Record<string, string>>({});
 
-  const { errors: keyErrors, hasDuplicates } = useDuplicateKeyValidation(rows);
+  const validationRows = pairs.map((pair, index) => ({
+    id: String(index),
+    key: pair.key,
+    value: pair.value
+  }));
+  const { errors: keyErrors, hasDuplicates } = useDuplicateKeyValidation(validationRows);
 
   useEffect(() => {
     if (open && useCase) {
       // Use setTimeout to avoid synchronous state update warning
       const timer = setTimeout(() => {
-        setRows(
-          useCase.template.fields.map((field, index) => ({
-            id: `${useCase.id}-${index}`,
-            key: field,
-            value: "",
-          })),
-        );
+        setPairs([{ key: "", value: "" }]);
       }, 0);
       return () => clearTimeout(timer);
     }
   }, [open, useCase]);
 
-  // Update manifestData whenever rows change to keep preview in sync if needed
-  useEffect(() => {
-    const data: Record<string, string> = {};
-    rows.forEach(row => {
-      if (row.key) data[row.key] = row.value;
-    });
-    // Use setTimeout to avoid synchronous state update warning
-    const timer = setTimeout(() => {
-      setManifestData(data);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [rows]);
-
-  const handleRowChange = useCallback(
-    (id: string, field: "key" | "value", value: string) => {
-      setRows((prev) =>
-        prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+  const handlePairChange = useCallback(
+    (index: number, field: "key" | "value", value: string) => {
+      setPairs((prev) =>
+        prev.map((pair, i) => (i === index ? { ...pair, [field]: value } : pair)),
       );
     },
     [],
   );
 
+  const handleAddPair = useCallback(() => {
+    setPairs((prev) => [...prev, { key: "", value: "" }]);
+  }, []);
+
+  const handleRemovePair = useCallback(() => {
+    setPairs((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.slice(0, -1);
+    });
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (hasDuplicates) return;
-    const content = JSON.stringify(
-      rows.reduce((acc, row) => {
-        if (row.key) acc[row.key] = row.value;
-        return acc;
-      }, {} as Record<string, string>),
-      null,
-      2,
-    );
+    
+    const manifestObj = pairs.reduce((acc, pair) => {
+      const key = pair.key.trim();
+      if (key) {
+        acc[key] = pair.value.trim();
+      }
+      return acc;
+    }, {} as Record<string, string>);
+
+    const content = JSON.stringify(manifestObj, null, 2);
+
+    const blob = new Blob([content], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "manifest.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     onGenerated?.(content);
     setSubmitted(true);
   }
 
   function handleClose() {
-    setRows([]);
+    setPairs([{ key: "", value: "" }]);
     setSubmitted(false);
     onClose();
   }
@@ -180,11 +189,88 @@ export default function ManifestGeneratorModal({ open, useCase, onClose, onGener
                     className="flex flex-col gap-5"
                   >
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Build your manifest metadata below. Add, edit, or reorder key-value pairs.
+                      Build your manifest metadata below. Add or remove key-value pairs.
                       Updates are reflected in the preview. All data is processed client-side until you
                       anchor.
                     </p>
-                    <KeyValueBuilder rows={rows} errors={keyErrors} onChange={handleRowChange} />
+
+                    <div className="space-y-3">
+                      {pairs.map((pair, index) => {
+                        const errorId = `manifest-key-error-${index}`;
+                        const error = keyErrors[String(index)];
+
+                        return (
+                          <div
+                            key={index}
+                            className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 sm:grid-cols-5 sm:items-start"
+                          >
+                            <div className="sm:col-span-2 space-y-1">
+                              <label
+                                className="text-xs font-medium text-gray-600 dark:text-gray-300"
+                              >
+                                {`Key${pairs.length > 1 ? ` ${index + 1}` : ""}`}
+                              </label>
+                              <input
+                                type="text"
+                                value={pair.key}
+                                onChange={(e) => handlePairChange(index, "key", e.target.value)}
+                                aria-invalid={Boolean(error)}
+                                aria-describedby={error ? errorId : undefined}
+                                placeholder="Enter key"
+                                className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-900/40 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition ${
+                                  error
+                                    ? "border-red-400 dark:border-red-600"
+                                    : "border-gray-300 dark:border-white/10"
+                                }`}
+                              />
+                              {error && (
+                                <p id={errorId} className="text-xs text-red-600 dark:text-red-400">
+                                  {error}
+                                </p>
+                              )}
+                            </div>
+                            <div className="sm:col-span-3 space-y-1">
+                              <label
+                                className="text-xs font-medium text-gray-600 dark:text-gray-300"
+                              >
+                                Value
+                              </label>
+                              <input
+                                type="text"
+                                value={pair.value}
+                                onChange={(e) => handlePairChange(index, "value", e.target.value)}
+                                placeholder="Enter value"
+                                className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-3 justify-start">
+                      <button
+                        type="button"
+                        onClick={handleAddPair}
+                        className="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-white/10 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Pair
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemovePair}
+                        disabled={pairs.length <= 1}
+                        className={`flex items-center gap-2 rounded-lg border border-gray-300 dark:border-white/10 px-4 py-2 text-sm font-medium transition ${
+                          pairs.length <= 1
+                            ? "text-gray-400 dark:text-gray-600 bg-gray-50 dark:bg-white/5 cursor-not-allowed"
+                            : "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        }`}
+                      >
+                        <Minus className="h-4 w-4" />
+                        Remove Pair
+                      </button>
+                    </div>
 
                     {/* Live preview panel */}
                     <div>
@@ -196,10 +282,11 @@ export default function ManifestGeneratorModal({ open, useCase, onClose, onGener
                         aria-live="polite"
                         aria-label="Manifest JSON preview"
                       >
-                        {rows.length > 0
+                        {pairs.length > 0
                           ? JSON.stringify(
-                              rows.reduce((acc, row) => {
-                                if (row.key) acc[row.key] = row.value;
+                              pairs.reduce((acc, pair) => {
+                                const key = pair.key.trim();
+                                if (key) acc[key] = pair.value.trim();
                                 return acc;
                               }, {} as Record<string, string>),
                               null,
