@@ -7,8 +7,6 @@ import { WalletModal } from "./WalletModal";
 import ThemeToggle from "./ThemeToggle";
 import NetworkBadge from "./wallet/NetworkBadge";
 import WrongNetworkWarning from "./wallet/WrongNetworkWarning";
-import { useAuth } from "@/app/context/AuthContext";
-import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "#home", label: "Home" },
@@ -131,7 +129,7 @@ export default function Header() {
           : "bg-white dark:bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]"
       }`}
     >
-      
+
       <WrongNetworkWarning />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 

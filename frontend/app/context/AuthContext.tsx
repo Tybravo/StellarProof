@@ -17,24 +17,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const storedAuth = localStorage.getItem("stellarproof_auth");
-    if (storedAuth) {
-      try {
-        const parsed = JSON.parse(storedAuth);
-        if (parsed.isAuthenticated && parsed.user) {
-          setIsAuthenticated(parsed.isAuthenticated);
-          setUser(parsed.user);
-        }
-      } catch (e) {
-        console.error("Failed to parse auth from localStorage", e);
+// Lazy initializer to read auth from localStorage on mount
+function getInitialAuth(): { isAuthenticated: boolean; user: User | null } {
+  if (typeof window === "undefined") {
+    return { isAuthenticated: false, user: null };
+  }
+  const storedAuth = localStorage.getItem("stellarproof_auth");
+  if (storedAuth) {
+    try {
+      const parsed = JSON.parse(storedAuth);
+      if (parsed.isAuthenticated && parsed.user) {
+        return { isAuthenticated: parsed.isAuthenticated, user: parsed.user };
       }
+    } catch (e) {
+      console.error("Failed to parse auth from localStorage", e);
     }
-  }, []);
+  }
+  return { isAuthenticated: false, user: null };
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [authState, setAuthState] = useState<{ isAuthenticated: boolean; user: User | null }>(getInitialAuth);
+  const isAuthenticated = authState.isAuthenticated;
+  const user = authState.user;
 
   const login = async (email: string, password: string): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -45,8 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -64,8 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { name, email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -76,8 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
+    setAuthState({ isAuthenticated: false, user: null });
     localStorage.removeItem("stellarproof_auth");
   };
 
