@@ -15,20 +15,22 @@ export default function LoginPage() {
   const { reset } = useWizard();
   const { logout } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = React.useCallback(() => {
     logout();
     disconnect();
     reset();
     addToast({ type: "success", message: "You have been logged out successfully" });
     router.push("/login");
-  };
+  }, [logout, disconnect, reset, addToast, router]);
 
-  useEffect(() => {
-    // Expose logout handler to window for external calls
-    (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout = handleLogout;
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout = handleLogout;
+    }
     return () => {
-      // Cleanup on unmount
-      delete (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout;
+      if (typeof window !== "undefined") {
+        delete (window as Window & { __stellarproof_logout?: () => void }).__stellarproof_logout;
+      }
     };
   }, [handleLogout]);
 

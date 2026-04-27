@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState } from "react";
 
 interface User {
   name?: string;
@@ -32,14 +32,8 @@ function getInitialAuth(): { isAuthenticated: boolean; user: User | null } {
     } catch (e) {
       console.error("Failed to parse auth from localStorage", e);
     }
-  }
-  return { isAuthenticated: false, user: null };
-}
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<{ isAuthenticated: boolean; user: User | null }>(getInitialAuth);
-  const isAuthenticated = authState.isAuthenticated;
-  const user = authState.user;
+    return null;
+  });
 
   const login = async (email: string, password: string): Promise<void> => {
     return new Promise((resolve, reject) => {
