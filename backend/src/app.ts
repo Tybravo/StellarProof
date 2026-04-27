@@ -11,6 +11,8 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import rootRouter from "./routes";
 import { globalErrorHandler } from "./middlewares/errorHandler";
+import { setupSwagger } from './docs/swagger';
+
 
 export function createApp(): Application {
   const app = express();
@@ -48,6 +50,8 @@ export function createApp(): Application {
   // -------------------------------------------------------------------------
   app.use(rootRouter);
 
+  setupSwagger(app); // ← add this
+
   // -------------------------------------------------------------------------
   // 404 handler – catch unmatched routes
   // -------------------------------------------------------------------------
@@ -63,5 +67,25 @@ export function createApp(): Application {
   // -------------------------------------------------------------------------
   app.use(globalErrorHandler);
 
+
+
   return app;
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
