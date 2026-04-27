@@ -36,6 +36,11 @@ function getInitialAuth(): { isAuthenticated: boolean; user: User | null } {
   return { isAuthenticated: false, user: null };
 }
 
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [authState, setAuthState] = useState<{ isAuthenticated: boolean; user: User | null }>(getInitialAuth);
+  const isAuthenticated = authState.isAuthenticated;
+  const user = authState.user;
+
   const login = async (email: string, password: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
