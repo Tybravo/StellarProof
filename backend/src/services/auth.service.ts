@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User, { IUser } from '../models/User.model';
 import { AppError } from '../errors/AppError';
 import { env } from '../config/env';
@@ -27,6 +28,10 @@ export interface RegisterResult {
     isActive: boolean;
     createdAt: Date;
   };
+}
+
+export interface ForgotPasswordResult {
+  message: string;
 }
 
 export class AuthService {
@@ -127,9 +132,44 @@ export class AuthService {
       },
     };
   }
+
+  async forgotPassword(email: string): Promise<ForgotPasswordResult> {
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!normalizedEmail) {
+      throw new AppError('Email is required', 400, 'EMAIL_REQUIRED');
+    }
+
+    const successMessage = 'If an account with that email exists, a password reset link has been sent.';
+
+    const user = await User.findOne({ email: normalizedEmail })
+      .select('+resetPasswordToken +resetPasswordExpires')
+      .exec();
+
+    if (!user) {
+      return { message: successMessage };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    await this.sendPasswordResetEmail(user.email, resetToken);
+
+    return { message: successMessage };
+  }
+
+  private async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    void email;
+    void token;
+    // TODO: Replace this no-op with an email provider integration.
+  }
 }
 
 export const authService = new AuthService();
 
 // Standalone helper for direct imports
 export const registerUser = (input: RegisterInput) => authService.register(input);
+export const forgotPassword = (email: string) => authService.forgotPassword(email);
