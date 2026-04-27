@@ -2,6 +2,7 @@
 export type VerificationStatus = 'Pending' | 'Verified' | 'Rejected';
 
 // Simulating a Soroban RPC call
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const fetchOracleStatus = async (_requestId: string): Promise<VerificationStatus> => {  await new Promise((resolve) => setTimeout(resolve, 800));
 
   const random = Math.random();

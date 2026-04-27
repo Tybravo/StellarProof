@@ -10,6 +10,7 @@ import { useToast } from "@/app/context/ToastContext";
 import { contactService } from "@/services/contact";
 import { ArrowLeft, Mail, Clock, HelpCircle, Paperclip, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const SUBJECT_OPTIONS = [
   { value: "", label: "Select a subject" },
@@ -423,11 +424,14 @@ export default function ContactPage() {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {previewUrl ? (
-                          <img
-                            src={previewUrl}
-                            alt="Preview"
-                            className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-200 dark:border-gray-600"
-                          />
+                          <div className="relative w-10 h-10 flex-shrink-0 border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
+                            <Image
+                              src={previewUrl}
+                              alt="Preview"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
                         ) : (
                           <Paperclip
                             size={16}
