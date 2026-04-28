@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Failed to parse auth from localStorage", e);
         }
       }
+    } catch (e) {
+      console.error("Failed to parse auth from localStorage", e);
     }
     return null;
   });
@@ -57,8 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -76,8 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { name, email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -88,8 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
+    setAuthState({ isAuthenticated: false, user: null });
     localStorage.removeItem("stellarproof_auth");
   };
 
