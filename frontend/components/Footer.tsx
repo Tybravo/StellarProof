@@ -2,7 +2,7 @@
 
 import { Github, Twitter, Send, DiscIcon } from "lucide-react";
 import Link from "next/link";
-
+  
 function LogoIcon() {
   return (
     <div
