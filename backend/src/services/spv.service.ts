@@ -124,12 +124,13 @@ class SPVService {
         isSealed: true,
       });
 
-      return {
+return {
         spvRecord,
         asset,
         storageUrl,
         storageReferenceId,
       };
+
     } catch (dbError) {
       if (params.storageProvider === 'cloudinary' && storageReferenceId) {
         await cloudinary.uploader
@@ -208,41 +209,4 @@ class SPVService {
     });
   }
 }
-
-/**
- * Encrypts a file buffer using the user's active KMS key
- */
-export async function encryptFileForSPV(
-  fileBuffer: Buffer,
-  userId: string
-): Promise<EncryptedFileData> {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid userId format');
-  }
-
-  const activeKey = await KMSKey.findOne({
-    creatorId: userId,
-    isActive: true
-  });
-
-  if (!activeKey) {
-    throw new Error('No active KMS key found for user');
-  }
-
-  const masterKey = resolveMasterKey();
-  // Note: This logic should ideally match the wrapped key strategy used in uploadEncryptedAsset
-  // For now, we provide the exported function to satisfy the middleware's requirement.
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', crypto.randomBytes(32), iv); // Mocking for now
-  const encryptedBuffer = Buffer.concat([cipher.update(fileBuffer), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  return {
-    encryptedBuffer,
-    iv: iv.toString('hex'),
-    authTag: authTag.toString('hex'),
-    keyVersion: activeKey.keyVersion
-  };
-}
-
 export const spvService = new SPVService();
