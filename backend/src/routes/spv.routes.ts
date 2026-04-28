@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect } from '../middlewares/auth.middleware';
+import { handleSPVUpload } from '../middlewares/spv.middleware';
 import {
   uploadEncryptedAsset,
   getSPVRecord,
   getUserSPVRecords,
-  updateSealedStatus
+  updateSealedStatus,
 } from '../controllers/spv.controller';
 
 const router = Router();
@@ -14,15 +15,21 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  }
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
 });
 
 /**
- * POST /api/v1/spv/upload
+ * POST /api/v1/spv/records/upload
  * Upload a file with SPV encryption
  */
-router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
+router.post(
+  '/upload',
+  protect,
+  upload.single('file'),
+  handleSPVUpload,
+  uploadEncryptedAsset
+);
 
 /**
  * GET /api/v1/spv/records/user
@@ -31,7 +38,7 @@ router.post('/upload', protect, upload.single('file'), uploadEncryptedAsset);
 router.get('/records/user', protect, getUserSPVRecords);
 
 /**
- * GET /api/v1/spv/:spvId
+ * GET /api/v1/spv/records/:spvId
  * Get SPV record by ID
  */
 router.get('/:spvId', protect, getSPVRecord);

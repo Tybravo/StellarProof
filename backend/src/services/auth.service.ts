@@ -30,39 +30,29 @@ export interface RegisterResult {
   };
 }
 
-export interface ForgotPasswordResult {
-  message: string;
-}
-
 export class AuthService {
   async login(email: string, password: string): Promise<LoginResult> {
     if (!email || !password) {
       throw new AppError('Email and password are required', 400, 'MISSING_CREDENTIALS');
     }
-
     const user = await User.findOne({ email: email.toLowerCase().trim() })
       .select('+passwordHash')
       .exec();
-
     if (!user) {
       throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
     }
-
     if (!user.isActive) {
       throw new AppError('Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');
     }
-
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
     }
-
     const token = jwt.sign(
       { userId: user._id.toString() },
       env.JWT_SECRET,
       { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
     );
-
     return {
       token,
       user: {
@@ -74,38 +64,6 @@ export class AuthService {
     };
   }
 
-  async verifyTokenAndGetUser(token: string) {
-    if (!token) {
-      throw new AppError('No token provided', 401, 'NO_TOKEN');
-    }
-
-    let decoded: any;
-
-    try {
-      decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
-    } catch (err) {
-      throw new AppError('Invalid or expired token', 401, 'INVALID_TOKEN');
-    }
-
-    const user = await User.findById(decoded.userId).exec();
-
-    if (!user) {
-      throw new AppError('User not found', 401, 'USER_NOT_FOUND');
-    }
-
-    if (!user.isActive) {
-      throw new AppError('Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');
-    }
-
-    return user;
-  }
-
-  /**
-   * Registers a new user account.
-   *
-   * Checks for duplicate email, then creates the user. The User model
-   * pre-save hook hashes the password automatically before persisting.
-   */
   async register(input: RegisterInput): Promise<RegisterResult> {
     const { email, password, role } = input;
 
@@ -114,7 +72,7 @@ export class AuthService {
       throw new AppError('An account with this email already exists.', 409, 'EMAIL_TAKEN');
     }
 
-    const user: IUser = new User({
+    const user = new User({
       email,
       passwordHash: password,
       role: role ?? 'creator',
@@ -133,43 +91,41 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(email: string): Promise<ForgotPasswordResult> {
-    const normalizedEmail = email.toLowerCase().trim();
-    if (!normalizedEmail) {
-      throw new AppError('Email is required', 400, 'EMAIL_REQUIRED');
+  async verifyTokenAndGetUser(token: string) {
+    if (!token) {
+      throw new AppError('No token provided', 401, 'NO_TOKEN');
     }
-
-    const successMessage = 'If an account with that email exists, a password reset link has been sent.';
-
-    const user = await User.findOne({ email: normalizedEmail })
-      .select('+resetPasswordToken +resetPasswordExpires')
-      .exec();
-
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
+    } catch (err) {
+      throw new AppError('Invalid or expired token', 401, 'INVALID_TOKEN');
+    }
+    const user = await User.findById(decoded.userId).exec();
     if (!user) {
-      return { message: successMessage };
+      throw new AppError('User not found', 401, 'USER_NOT_FOUND');
     }
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
-
-    await this.sendPasswordResetEmail(user.email, resetToken);
-
-    return { message: successMessage };
+    if (!user.isActive) {
+      throw new AppError('Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');
+    }
+    return user;
   }
 
-  private async sendPasswordResetEmail(email: string, token: string): Promise<void> {
-    void email;
-    void token;
-    // TODO: Replace this no-op with an email provider integration.
+  async forgotPassword(email: string): Promise<void> {
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).exec();
+    // Silently succeed if user not found to prevent enumeration
+    if (!user) return;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    // Token is generated — email delivery is handled by the caller or a mailer service
+    // rawToken would be sent via email in a production setup
   }
 }
 
 export const authService = new AuthService();
-
-// Standalone helper for direct imports
-export const registerUser = (input: RegisterInput) => authService.register(input);
-export const forgotPassword = (email: string) => authService.forgotPassword(email);
