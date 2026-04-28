@@ -69,14 +69,16 @@ export default function Footer() {
             {/* Social Icons */}
             <div className="flex gap-4" aria-label="Social media links">
               {([
-                { Icon: DiscIcon, label: "StellarProof on Discord" },
-                { Icon: Github, label: "StellarProof on GitHub" },
-                { Icon: Twitter, label: "StellarProof on Twitter" },
-                { Icon: Send, label: "StellarProof on Telegram" },
-              ] as const).map(({ Icon, label }) => (
+                { Icon: DiscIcon, label: "StellarProof on Discord", href: "https://discord.com/" },
+                { Icon: Github, label: "StellarProof on GitHub", href: "https://github.com/" },
+                { Icon: Twitter, label: "StellarProof on X", href: "https://x.com/" },
+                { Icon: Send, label: "StellarProof on Telegram", href: "https://web.telegram.org/a/" },
+              ] as const).map(({ Icon, label, href }) => (
                 <a
                   key={label}
-                  href="#"
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
                   aria-label={label}
                 >
