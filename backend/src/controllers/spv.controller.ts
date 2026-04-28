@@ -84,6 +84,54 @@ export const uploadEncryptedAsset = async (req: Request, res: Response): Promise
   }
 };
 
+export const sealSPV = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { assetId, accessType } = req.body;
+
+    if (!assetId) {
+      res.status(400).json({
+        success: false,
+        message: 'assetId must be provided'
+      });
+      return;
+    }
+
+    if (!['private', 'nft_holders_only'].includes(accessType)) {
+      res.status(400).json({
+        success: false,
+        message: 'accessType must be private or nft_holders_only'
+      });
+      return;
+    }
+
+    const spvRecord = await spvService.sealAsset(assetId, accessType);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: spvRecord._id,
+        assetId: spvRecord.assetId,
+        accessType: spvRecord.accessType,
+        kmsKey: spvRecord.kmsKey,
+        createdAt: spvRecord.createdAt
+      }
+    });
+  } catch (error: any) {
+    if (error.statusCode === 404) {
+      res.status(404).json({
+        success: false,
+        message: error.message
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
 export const getSPVRecord = async (req: Request, res: Response): Promise<void> => {
   const { spvId } = req.params;
 
