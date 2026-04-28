@@ -210,4 +210,3 @@ return {
   }
 }
 export const spvService = new SPVService();
-export type SupportedStorageProvider = 'cloudinary' | 'ipfs' | 's3' | 'mongodb';
