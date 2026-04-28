@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, register } from '../controllers/auth.controller';
+import { forgotPassword, login, register } from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -16,5 +16,12 @@ router.post('/login', login);
  * @access Public
  */
 router.post('/register', register);
+
+/**
+ * @route  POST /api/v1/auth/forgot-password
+ * @desc   Request a password reset token
+ * @access Public
+ */
+router.post('/forgot-password', forgotPassword);
 
 export default router;
