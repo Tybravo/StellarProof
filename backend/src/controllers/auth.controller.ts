@@ -114,3 +114,29 @@ export const register = async (
     next(err);
   }
 };
+
+/**
+ * POST /api/v1/auth/forgot-password
+ */
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email } = req.body as { email?: unknown };
+
+    if (typeof email !== 'string') {
+      return next(new AppError('Email must be a string', 400, 'INVALID_INPUT'));
+    }
+
+    const result = await authService.forgotPassword(email);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

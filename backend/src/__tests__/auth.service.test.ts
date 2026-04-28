@@ -1,5 +1,5 @@
 import { AuthService } from '../services/auth.service';
-import { AppError } from '../errors/AppError';
+import crypto from 'crypto';
 
 jest.mock('../models/User.model', () => ({
   __esModule: true,
@@ -26,7 +26,10 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     role: 'creator',
     isActive: true,
     stellarPublicKey: undefined,
+    resetPasswordToken: undefined,
+    resetPasswordExpires: undefined,
     comparePassword: jest.fn().mockResolvedValue(true),
+    save: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -107,5 +110,51 @@ describe('AuthService.login', () => {
     mockFindOne(makeUser({ stellarPublicKey: key }));
     const result = await service.login('user@example.com', 'pass');
     expect(result.user.stellarPublicKey).toBe(key);
+  });
+});
+
+describe('AuthService.forgotPassword', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    service = new AuthService();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('hashes and stores a reset password token for an existing user', async () => {
+    const rawToken = 'a'.repeat(64);
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    jest.spyOn(crypto, 'randomBytes').mockReturnValue(Buffer.from(rawToken, 'hex') as never);
+
+    const user = makeUser({
+      resetPasswordToken: undefined,
+      resetPasswordExpires: undefined,
+      save: jest.fn().mockResolvedValue(undefined),
+    });
+
+    mockFindOne(user);
+
+    const result = await service.forgotPassword(' USER@example.com ');
+
+    expect(mockedFindOne).toHaveBeenCalledWith({ email: 'user@example.com' });
+    expect(user.resetPasswordToken).toBe(hashedToken);
+    expect(user.resetPasswordToken).not.toBe(rawToken);
+    expect(user.resetPasswordExpires).toBeInstanceOf(Date);
+    expect((user.resetPasswordExpires as Date).getTime()).toBeGreaterThan(Date.now());
+    expect(user.save).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  });
+
+  it('returns success without saving when the email does not exist', async () => {
+    mockFindOne(null);
+
+    const result = await service.forgotPassword('missing@example.com');
+
+    expect(result).toEqual({
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
   });
 });
