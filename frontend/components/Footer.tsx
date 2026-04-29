@@ -1,7 +1,8 @@
 "use client";
 
 import { Github, Twitter, Send, DiscIcon } from "lucide-react";
-
+import Link from "next/link";
+  
 function LogoIcon() {
   return (
     <div
@@ -52,13 +53,13 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
           {/* Brand Section */}
           <div className="md:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
+            <Link href="/#home" className="flex items-center gap-3 mb-4 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1120]">
               <LogoIcon />
-              <div className="flex gap-1">
+              <div className="flex gap-1 group-hover:opacity-80 transition-opacity">
                 <span className="text-xl font-bold text-blue-400">Stellar</span>
                 <span className="text-xl font-bold text-pink-400">Proof</span>
               </div>
-            </div>
+            </Link>
             <p
               className={`text-sm leading-relaxed mb-6 max-w-xs ${textSecondary}`}
             >
@@ -69,14 +70,16 @@ export default function Footer() {
             {/* Social Icons */}
             <div className="flex gap-4" aria-label="Social media links">
               {([
-                { Icon: DiscIcon, label: "StellarProof on Discord" },
-                { Icon: Github, label: "StellarProof on GitHub" },
-                { Icon: Twitter, label: "StellarProof on Twitter" },
-                { Icon: Send, label: "StellarProof on Telegram" },
-              ] as const).map(({ Icon, label }) => (
+                { Icon: DiscIcon, label: "StellarProof on Discord", href: "https://discord.com/" },
+                { Icon: Github, label: "StellarProof on GitHub", href: "https://github.com/" },
+                { Icon: Twitter, label: "StellarProof on X", href: "https://x.com/" },
+                { Icon: Send, label: "StellarProof on Telegram", href: "https://web.telegram.org/a/" },
+              ] as const).map(({ Icon, label, href }) => (
                 <a
                   key={label}
-                  href="#"
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
                   aria-label={label}
                 >
@@ -135,20 +138,21 @@ export default function Footer() {
               </h3>
               <nav aria-label={section.title} className="space-y-3">
                 {section.links.map((link) => {
-                  const href =
-                    link === "Report an Issue"
-                      ? "/report-issue"
-                      : link === "Contact Us"
-                        ? "/contact"
-                        : "#";
+                  let href = "#";
+                  if (link === "Report an Issue") href = "/report-issue";
+                  else if (link === "Contact Us") href = "/contact";
+                  else if (link === "What is StellarProof") href = "/#home";
+                  else if (link === "How It Works") href = "/#how-it-works";
+                  else if (link === "Core Technology") href = "/#about";
+                  
                   return (
-                    <a
+                    <Link
                       key={link}
                       href={href}
                       className={`text-sm ${textSecondary} hover:text-blue-300 transition-colors block`}
                     >
                       {link}
-                    </a>
+                    </Link>
                   );
                 })}
               </nav>

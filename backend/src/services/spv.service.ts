@@ -2,18 +2,11 @@ import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'clo
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import mongoose from 'mongoose';
-import SPVRecord, { ISPVRecord } from '../models/SPVRecord.model';
+import SPVRecordModel, { ISPVRecord } from '../models/SPVRecord.model';
+import { SPVRecordModel as SealSPVRecord, ISealSPVRecord } from '../models/spv.model';
 import KMSKey from '../models/KMSKey.model';
 import Asset, { IAsset } from '../models/Asset.model';
-
-export type SupportedStorageProvider = 'cloudinary' | 'ipfs';
-
-export interface EncryptedFileData {
-  encryptedBuffer: Buffer;
-  iv: string;
-  authTag: string;
-  keyVersion: string;
-}
+type SupportedStorageProvider = 'cloudinary' | 'ipfs';
 
 function resolveCloudinaryConfig(): void {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
@@ -67,7 +60,6 @@ class SPVService {
     const authTag = cipher.getAuthTag(); // 128-bit integrity tag
 
     // Upload layout: [16-byte authTag | 12-byte IV | ciphertext]
-
     const uploadBuffer = Buffer.concat([authTag, assetIv, ciphertext]);
 
     // 3. Wrap the symmetric key with the server master key before DB storage
@@ -76,7 +68,6 @@ class SPVService {
     const keyCipher = crypto.createCipheriv('aes-256-gcm', masterKey, keyIv);
     const wrappedKey = Buffer.concat([keyCipher.update(symmetricKey), keyCipher.final()]);
     const keyAuthTag = keyCipher.getAuthTag();
-
     const encryptedKeyValue = Buffer.concat([keyAuthTag, wrappedKey]).toString('base64');
 
     // 4. Upload based on provider
@@ -116,7 +107,7 @@ class SPVService {
         accessPolicy: params.accessType,
       });
 
-      const spvRecord = await SPVRecord.create({
+      const spvRecord = await SPVRecordModel.create({
         assetId: asset._id,
         creatorId: params.creatorId,
         kmsKeyId: kmsKey._id,
@@ -148,7 +139,7 @@ class SPVService {
   ): Promise<ISPVRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(spvId)) return null;
 
-    const record = await SPVRecord.findById(spvId)
+    const record = await SPVRecordModel.findById(spvId)
       .populate('assetId')
       .populate('kmsKeyId', '-encryptedKeyValue -iv')
       .exec();
@@ -164,28 +155,6 @@ class SPVService {
       if (!isCreator && !isAllowed) return null;
     }
 
-    return record;
-  }
-
-  async getUserSPVRecords(userId: mongoose.Types.ObjectId): Promise<ISPVRecord[]> {
-    return SPVRecord.find({ creatorId: userId })
-      .populate('assetId')
-      .sort({ createdAt: -1 })
-      .exec();
-  }
-
-  async updateSealedStatus(
-    spvId: string,
-    isSealed: boolean,
-    userId: mongoose.Types.ObjectId,
-  ): Promise<ISPVRecord | null> {
-    if (!mongoose.Types.ObjectId.isValid(spvId)) return null;
-
-    const record = await SPVRecord.findOne({ _id: spvId, creatorId: userId });
-    if (!record) return null;
-
-    record.isSealed = isSealed;
-    await record.save();
     return record;
   }
 
@@ -210,6 +179,29 @@ class SPVService {
     });
   }
 
+  private generateKMSKey(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  public async sealAsset(assetId: string, accessType: 'private' | 'nft_holders_only'): Promise<ISealSPVRecord> {
+    const asset = await Asset.findById(assetId);
+    
+    if (!asset) {
+      throw new AppError('Asset not found', 404);
+    }
+
+    const kmsKey = this.generateKMSKey();
+
+    const spvRecord = new SealSPVRecord({
+      assetId,
+      accessType,
+      kmsKey,
+    });
+
+    await spvRecord.save();
+    
+    return spvRecord;
+  }
 }
 
 /**
@@ -219,11 +211,9 @@ export async function encryptFileForSPV(
   fileBuffer: Buffer,
   userId: string
 ): Promise<EncryptedFileData> {
-
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid userId format');
   }
-
 
   const activeKey = await KMSKey.findOne({
     creatorId: userId,
@@ -250,4 +240,109 @@ export async function encryptFileForSPV(
   };
 }
 
-export const spvService = new SPVService();
+/**
+ * Creates an SPV record for an encrypted asset
+ */
+export async function createSPVRecord(data: SPVRecordData) {
+  const spvRecord = new SPVRecord(data);
+  await spvRecord.save();
+  return spvRecord;
+}
+
+/**
+ * Gets an SPV record by asset ID
+ */
+export async function getSPVRecordByAssetId(assetId: string) {
+  if (!mongoose.Types.ObjectId.isValid(assetId)) {
+    throw new Error('Invalid assetId format');
+  }
+
+  return await SPVRecord.findOne({ assetId })
+    .populate('assetId')
+    .populate('kmsKeyId');
+}
+
+/**
+ * Gets all SPV records for a user
+ */
+export async function getSPVRecordsByUser(userId: string) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid userId format');
+  }
+
+  return await SPVRecord.find({ creatorId: userId })
+    .populate('assetId')
+    .populate('kmsKeyId')
+    .sort({ createdAt: -1 });
+}
+
+/**
+ * Updates the sealed status of an SPV record
+ */
+export async function updateSealedStatus(
+  spvRecordId: string,
+  isSealed: boolean
+) {
+  if (!mongoose.Types.ObjectId.isValid(spvRecordId)) {
+    throw new Error('Invalid SPV record ID format');
+  }
+
+  const spvRecord = await SPVRecord.findById(spvRecordId);
+
+  if (!spvRecord) {
+    throw new Error('SPV record not found');
+  }
+
+  spvRecord.isSealed = isSealed;
+  await spvRecord.save();
+
+  return spvRecord;
+}
+
+/**
+ * Decrypts a file buffer using the specified KMS key version
+ */
+export async function decryptFileFromSPV(
+  encryptedBuffer: Buffer,
+  iv: string,
+  authTag: string,
+  userId: string,
+  keyVersion: string
+): Promise<Buffer> {
+  // Validate userId format
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid userId format');
+  }
+
+  // Get the specific KMS key version
+  const kmsKey = await KMSKey.findOne({
+    creatorId: userId,
+    keyVersion: keyVersion
+  });
+
+  if (!kmsKey) {
+    throw new Error(`KMS key version ${keyVersion} not found for user`);
+  }
+
+  // Decrypt the symmetric key from KMS
+  const symmetricKey = decryptKeyWithMaster(
+    kmsKey.encryptedKeyValue,
+    kmsKey.iv,
+    kmsKey.authTag
+  );
+
+  // Decrypt the file buffer
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    symmetricKey,
+    Buffer.from(iv, 'hex')
+  );
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+
+  const decryptedBuffer = Buffer.concat([
+    decipher.update(encryptedBuffer),
+    decipher.final()
+  ]);
+
+  return decryptedBuffer;
+}

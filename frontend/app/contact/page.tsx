@@ -10,6 +10,7 @@ import { useToast } from "@/app/context/ToastContext";
 import { contactService } from "@/services/contact";
 import { ArrowLeft, Mail, Clock, HelpCircle, Paperclip, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const SUBJECT_OPTIONS = [
   { value: "", label: "Select a subject" },
@@ -24,9 +25,8 @@ const SUBJECT_OPTIONS = [
 const ALLOWED_FILE_TYPES = [
   "image/png",
   "image/jpeg",
-  "image/gif",
-  "application/pdf",
-  "text/plain",
+  "image/jpg",
+  "image/webp",
 ];
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -43,10 +43,19 @@ const contactSchema = z.object({
   subject: z
     .string()
     .min(1, "Please select a subject"),
+  otherSubject: z.string().optional(),
   message: z
     .string()
     .min(20, "Message must be at least 20 characters")
     .max(1000, "Message must not exceed 1000 characters"),
+}).superRefine((data, ctx) => {
+  if (data.subject === "other" && (!data.otherSubject || data.otherSubject.trim().length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["otherSubject"],
+      message: "Please specify the subject",
+    });
+  }
 });
 
 type ContactFormInputs = z.infer<typeof contactSchema>;
@@ -67,23 +76,43 @@ export default function ContactPage() {
     setValue,
     watch,
   } = useForm<ContactFormInputs>({
-    // @ts-expect-error – @hookform/resolvers v5 type mismatch with zod v4.3.x
-    resolver: zodResolver(contactSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(contactSchema as any),
     mode: "onBlur",
     defaultValues: {
       fullName: "",
       email: "",
       subject: "",
+      otherSubject: "",
       message: "",
     },
   });
 
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const messageValue = watch("message") || "";
   const messageLength = messageValue.length;
+  const subjectValue = watch("subject");
+
+  useEffect(() => {
+    if (subjectValue !== "other") {
+      setValue("otherSubject", "", { shouldValidate: false, shouldDirty: true });
+    }
+  }, [subjectValue, setValue]);
+
+  // Clean up preview URL
+  useEffect(() => {
+    if (attachment && attachment.type.startsWith("image/")) {
+      const url = URL.createObjectURL(attachment);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setPreviewUrl(null);
+  }, [attachment]);
 
   // Auto-fill name and email for authenticated users
   useEffect(() => {
@@ -94,26 +123,46 @@ export default function ContactPage() {
     }
   }, [publicKey, setValue]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processFile = (file: File | undefined) => {
     setAttachmentError(null);
-    const file = e.target.files?.[0];
     if (!file) {
       setAttachment(null);
       return;
     }
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
       setAttachmentError(
-        "Only PNG, JPG, GIF, PDF, and TXT files are allowed"
+        "Only PNG, JPG, JPEG, and WEBP files are allowed"
       );
-      e.target.value = "";
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
       setAttachmentError("File size must not exceed 5MB");
-      e.target.value = "";
       return;
     }
     setAttachment(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    processFile(file);
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    processFile(file);
   };
 
   const removeAttachment = () => {
@@ -140,6 +189,7 @@ export default function ContactPage() {
             ? `${publicKey!.slice(0, 8)}@stellar.wallet`
             : "",
           subject: "",
+          otherSubject: "",
           message: "",
         });
         removeAttachment();
@@ -295,6 +345,29 @@ export default function ContactPage() {
                   )}
                 </div>
 
+                {/* Other Subject (Conditional) */}
+                {subjectValue === "other" && (
+                  <div>
+                    <label htmlFor="otherSubject" className={labelClass}>
+                      Other Subject <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="otherSubject"
+                      type="text"
+                      {...register("otherSubject")}
+                      placeholder="Please specify your subject"
+                      className={`${inputBase} ${
+                        errors.otherSubject ? inputError : inputNormal
+                      }`}
+                    />
+                    {errors.otherSubject && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.otherSubject.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Message */}
                 <div>
                   <label htmlFor="message" className={labelClass}>
@@ -349,32 +422,45 @@ export default function ContactPage() {
                           : "border-gray-300 bg-gray-50"
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Paperclip
-                          size={16}
-                          className={
-                            isDark ? "text-gray-400" : "text-gray-500"
-                          }
-                        />
-                        <span
-                          className={`text-sm truncate ${
-                            isDark ? "text-gray-200" : "text-gray-700"
-                          }`}
-                        >
-                          {attachment.name}
-                        </span>
-                        <span
-                          className={`text-xs flex-shrink-0 ${
-                            isDark ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          ({(attachment.size / 1024).toFixed(1)} KB)
-                        </span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {previewUrl ? (
+                          <div className="relative w-10 h-10 flex-shrink-0 border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
+                            <Image
+                              src={previewUrl}
+                              alt="Preview"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <Paperclip
+                            size={16}
+                            className={
+                              isDark ? "text-gray-400" : "text-gray-500"
+                            }
+                          />
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span
+                            className={`text-sm truncate font-medium ${
+                              isDark ? "text-gray-200" : "text-gray-700"
+                            }`}
+                          >
+                            {attachment.name}
+                          </span>
+                          <span
+                            className={`text-xs ${
+                              isDark ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            {(attachment.size / 1024).toFixed(1)} KB
+                          </span>
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={removeAttachment}
-                        className="ml-2 text-red-500 hover:text-red-400 transition-colors"
+                        className="ml-2 text-red-500 hover:text-red-400 transition-colors flex-shrink-0"
                         aria-label="Remove attachment"
                       >
                         <X size={16} />
@@ -382,22 +468,27 @@ export default function ContactPage() {
                     </div>
                   ) : (
                     <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                       className={`border-2 border-dashed rounded-md p-6 text-center transition-colors ${
-                        attachmentError
-                          ? "border-red-500"
-                          : isDark
-                            ? "border-gray-600"
-                            : "border-gray-300"
+                        isDragOver
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : attachmentError
+                            ? "border-red-500"
+                            : isDark
+                              ? "border-gray-600 hover:border-gray-500"
+                              : "border-gray-300 hover:border-gray-400"
                       }`}
                     >
                       <input
                         id="attachment"
                         type="file"
-                        accept=".png,.jpg,.jpeg,.gif,.pdf,.txt"
+                        accept=".png,.jpg,.jpeg,.webp"
                         onChange={handleFileChange}
                         className="hidden"
                       />
-                      <label htmlFor="attachment" className="cursor-pointer">
+                      <label htmlFor="attachment" className="cursor-pointer block">
                         <Paperclip
                           size={24}
                           className={`mx-auto mb-2 ${
@@ -412,14 +503,14 @@ export default function ContactPage() {
                           <span className="font-semibold text-blue-500">
                             Click to upload
                           </span>{" "}
-                          a file
+                          or drag and drop an image
                         </div>
                         <p
                           className={`text-xs mt-1 ${
                             isDark ? "text-gray-400" : "text-gray-500"
                           }`}
                         >
-                          PNG, JPG, GIF, PDF, or TXT (max 5MB)
+                          PNG, JPG, JPEG, or WEBP (max 5MB)
                         </p>
                       </label>
                     </div>

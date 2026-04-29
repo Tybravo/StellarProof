@@ -139,7 +139,7 @@ export default function ReviewStep({
     try {
       await onSubmit?.();
       setSubmitted(true);
-    } catch (_error) {
+    } catch {
       setSubmitted(false);
     }
   }

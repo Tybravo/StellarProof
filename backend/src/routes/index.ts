@@ -10,6 +10,8 @@ import manifestRoutes from "./manifest.routes";
 import developerRoutes from "./developer.routes";
 import authRoutes from "./auth.routes";
 import userRoutes from "./user.routes";
+import ipfsRoutes from "./ipfs.routes";
+import mediaRoutes from "./media.routes";
 
 const router = Router();
 
@@ -32,5 +34,7 @@ router.use("/api/v1/verification/jobs", verificationRoutes);
 router.use("/api/v1/developer", developerRoutes);
 router.use("/api/v1/auth", authRoutes);
 router.use("/api/v1/users", userRoutes);
+router.use("/api/v1/ipfs", ipfsRoutes);
+router.use("/api/v1/media", mediaRoutes);
 
 export default router;

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, Network, ScanLine, ShieldCheck, Lock } from "lucide-react";
+import Link from "next/link";
 
 const features = [
   {
@@ -96,10 +97,10 @@ export default function HeroSection() {
             variants={itemVariants}
             className="mt-5 flex flex-col sm:flex-row items-center gap-4"
           >
-            <button className="group flex items-center gap-2 px-8 py-3.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-500 transition-all duration-200">
-              Get Started
+            <Link href="/launch" className="group flex items-center gap-2 px-8 py-3.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-500 transition-all duration-200">
+              Launch App
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </button>
+            </Link>
             <button className="px-8 py-3.5 rounded-lg border border-gray-300 dark:border-white/20 text-gray-900 dark:text-white font-semibold text-sm hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200">
               View Documentation
             </button>
