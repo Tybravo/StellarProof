@@ -18,6 +18,7 @@ const NAV_LINKS = [
       { href: "#developer", label: "Developer" },
     ],
   },
+
   {
     label: "Instances",
     children: [
@@ -77,11 +78,22 @@ export default function Header() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [mobileDropdown, setMobileDropdown] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("#home");
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const handleNavClick = useCallback((href?: string) => {
     if (href) scrollToSection(href);
     setMobileOpen(false);
     setMobileDropdown(null);
+  }, []);
+
+  // Track scroll position for glassmorphism effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
@@ -109,7 +121,15 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-white/20 bg-white dark:bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)] transition-colors duration-300">
+    <header
+      className={`sticky top-0 z-50 w-full border-b border-gray-200 dark:border-white/20 transition-all duration-300 ${
+        // Glassmorphism effect when scrolled
+        isScrolled
+          ? "bg-white/80 dark:bg-darkblue/80 backdrop-blur-md shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]"
+          : "bg-white dark:bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]"
+      }`}
+    >
+      
       <WrongNetworkWarning />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 

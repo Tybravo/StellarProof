@@ -65,7 +65,37 @@ const SPVSchema = new Schema<SPVDocument>(
 
 
 
-// export const SPVModel = model<SPVDocument>("SPVRecord", SPVSchema);
+export const SPVModel = (mongoose.models['SPVRecord'] || model<SPVDocument>("SPVRecord", SPVSchema)) as mongoose.Model<SPVDocument>;
 
+// New SPVRecord schema as requested for the /seal endpoint
+export interface ISealSPVRecord extends Document {
+  assetId: Schema.Types.ObjectId;
+  accessType: "private" | "nft_holders_only";
+  kmsKey: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export const SPVModel = (mongoose.models.SPVRecord || model<SPVDocument>("SPVRecord", SPVSchema)) as mongoose.Model<SPVDocument>;
+const SealSPVRecordSchema = new Schema<ISealSPVRecord>(
+  {
+    assetId: {
+      type: Schema.Types.ObjectId,
+      ref: "Asset",
+      required: [true, "assetId is required"],
+    },
+    accessType: {
+      type: String,
+      enum: ["private", "nft_holders_only"],
+      required: [true, "accessType is required"],
+    },
+    kmsKey: {
+      type: String,
+      required: [true, "kmsKey is required"],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+export const SPVRecordModel = model<ISealSPVRecord>("SealSPVRecord", SealSPVRecordSchema);

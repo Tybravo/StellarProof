@@ -61,11 +61,4 @@ const SPVRecordSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-// export default mongoose.model<ISPVRecord>('SPVRecord', SPVRecordSchema);
-
-
-// // Change from:
-// export default mongoose.model('SPVRecord', SPVRecordSchema);
-
-// To:
-export default mongoose.models.SPVRecord || mongoose.model<ISPVRecord>('SPVRecord', SPVRecordSchema);
+export default mongoose.models['SPVRecord'] as mongoose.Model<ISPVRecord> || mongoose.model<ISPVRecord>('SPVRecord', SPVRecordSchema);
