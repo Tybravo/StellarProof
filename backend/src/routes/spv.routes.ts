@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect } from '../middlewares/auth.middleware';
-
 import { handleSPVUpload } from '../middlewares/spv.middleware';
 import {
   uploadEncryptedAsset,

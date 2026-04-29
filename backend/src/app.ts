@@ -5,19 +5,15 @@
  * tests without binding a network port.
  */
 
+import express, { type Application, type Request, type Response } from "express";
+import helmet from "helmet";
 import cors from "cors";
 import { setupSwagger } from './docs/swagger';
-import express, { type Application, type Request, type Response } from 'express';
-import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { corsMiddleware, apiV1RateLimiter, authRateLimiter } from './config/security';
 import rootRouter from './routes';
 import { globalErrorHandler } from './middlewares/errorHandler';
-
-
-
-
 
 export function createApp(): Application {
   const app = express();
@@ -51,7 +47,6 @@ export function createApp(): Application {
   // -------------------------------------------------------------------------
   // 404 handler – catch unmatched routes
   // -------------------------------------------------------------------------
-
   app.use((_req: Request, res: Response): void => {
     res.status(404).json({
       success: false,
@@ -68,6 +63,7 @@ export function createApp(): Application {
   return app;
 
 }
+
 
 
 

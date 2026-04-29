@@ -99,4 +99,3 @@ const SealSPVRecordSchema = new Schema<ISealSPVRecord>(
 );
 
 export const SPVRecordModel = model<ISealSPVRecord>("SealSPVRecord", SealSPVRecordSchema);
-

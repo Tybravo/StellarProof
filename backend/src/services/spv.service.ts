@@ -69,6 +69,7 @@ class SPVService {
     const authTag = cipher.getAuthTag(); // 128-bit integrity tag
 
     // Upload layout: [16-byte authTag | 12-byte IV | ciphertext]
+
     const uploadBuffer = Buffer.concat([authTag, assetIv, ciphertext]);
 
     // 3. Wrap the symmetric key with the server master key before DB storage
@@ -313,32 +314,7 @@ class SPVService {
       Readable.from(buffer).pipe(uploadStream);
     });
   }
-
-  private generateKMSKey(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
-
-  public async sealAsset(assetId: string, accessType: 'private' | 'nft_holders_only'): Promise<ISealSPVRecord> {
-    const asset = await Asset.findById(assetId);
-    
-    if (!asset) {
-      throw new AppError('Asset not found', 404);
-    }
-
-    const kmsKey = this.generateKMSKey();
-
-    const spvRecord = new SealSPVRecord({
-      assetId,
-      accessType,
-      kmsKey,
-    });
-
-    await spvRecord.save();
-    
-    return spvRecord;
-  }
 }
-
 /**
  * Encrypts a file buffer using the user's active KMS key
  */
@@ -349,6 +325,7 @@ export async function encryptFileForSPV(
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid userId format');
   }
+
 
   const activeKey = await KMSKey.findOne({
     creatorId: userId,

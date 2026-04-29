@@ -29,7 +29,6 @@
     "node-cron": "^4.2.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-
     "pinata": "^2.5.5",
     "zod": "^3.23.8"
   },
