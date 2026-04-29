@@ -64,8 +64,8 @@ const SPVSchema = new Schema<SPVDocument>(
 );
 
 
+export const SPVModel = (mongoose.models.SPVRecord || model<SPVDocument>("SPVRecord", SPVSchema)) as mongoose.Model<SPVDocument>;
 
-export const SPVModel = (mongoose.models['SPVRecord'] || model<SPVDocument>("SPVRecord", SPVSchema)) as mongoose.Model<SPVDocument>;
 
 // New SPVRecord schema as requested for the /seal endpoint
 export interface ISealSPVRecord extends Document {
