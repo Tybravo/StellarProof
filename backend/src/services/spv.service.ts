@@ -189,6 +189,110 @@ class SPVService {
     return record;
   }
 
+  async unsealAsset(spvId: string, requestingUserId: mongoose.Types.ObjectId): Promise<{ buffer: Buffer; contentType: string }> {
+    if (!mongoose.Types.ObjectId.isValid(spvId)) {
+      throw new Error('Invalid SPV Record ID');
+    }
+
+    const spvRecord = await SPVRecordModel.findById(spvId)
+      .populate<{ assetId: IAsset }>('assetId')
+      .populate<{ kmsKeyId: any }>('kmsKeyId')
+      .exec();
+
+    if (!spvRecord) {
+      throw new Error('SPVRecord not found');
+    }
+
+    const asset = spvRecord.assetId;
+    if (!asset) {
+      throw new Error('Asset not found');
+    }
+
+    // Authorization check
+    if (spvRecord.accessType === 'private') {
+      if (!asset.creatorId.equals(requestingUserId)) {
+        throw new Error('Unauthorized: Private access only');
+      }
+    } else if (spvRecord.accessType === 'nft_holders_only') {
+      const isHolder = await this.checkNFTHolder(requestingUserId, asset);
+      if (!isHolder) {
+        throw new Error('Unauthorized: Must be an NFT holder');
+      }
+    } else if (spvRecord.accessType === 'specific_users') {
+      const isCreator = asset.creatorId.equals(requestingUserId);
+      const isAllowed = spvRecord.allowedUsers?.some((id: mongoose.Types.ObjectId) => id.equals(requestingUserId));
+      if (!isCreator && !isAllowed) {
+        throw new Error('Unauthorized: You do not have permission to access this asset');
+      }
+    } else if (spvRecord.accessType !== 'public_with_conditions') {
+      throw new Error('Unauthorized: Invalid access type');
+    }
+
+    // Fetch encrypted payload
+    const encryptedPayload = await this.fetchEncryptedPayload(asset);
+
+    // Decrypt payload
+    const kmsKey = spvRecord.kmsKeyId;
+    const decryptedBuffer = this.decryptPayload(encryptedPayload, kmsKey);
+
+    return {
+      buffer: decryptedBuffer,
+      contentType: asset.mimeType || 'application/octet-stream',
+    };
+  }
+
+  private async checkNFTHolder(userId: mongoose.Types.ObjectId, asset: IAsset): Promise<boolean> {
+    // Placeholder for actual NFT verification logic against Stellar blockchain
+    return true; 
+  }
+
+  private async fetchEncryptedPayload(asset: IAsset): Promise<Buffer> {
+    if (asset.storageProvider === 'cloudinary') {
+      resolveCloudinaryConfig();
+      // Use Cloudinary SDK to fetch the raw resource directly
+      try {
+        const url = cloudinary.url(asset.storageReferenceId, { resource_type: 'raw', secure: true });
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch from Cloudinary: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+      } catch (error) {
+        throw new Error('Failed to fetch encrypted payload from storage');
+      }
+    } else {
+      throw new Error(`Storage provider ${asset.storageProvider} not yet implemented for download`);
+    }
+  }
+
+  private decryptPayload(encryptedData: Buffer, kmsKey: any): Buffer {
+    try {
+      // 1. Unwrap the symmetric key
+      const masterKey = resolveMasterKey();
+      const keyBuffer = Buffer.from(kmsKey.encryptedKeyValue, 'base64');
+      const keyAuthTag = keyBuffer.subarray(0, 16);
+      const wrappedKey = keyBuffer.subarray(16);
+      const keyIv = Buffer.from(kmsKey.iv, 'hex');
+
+      const keyDecipher = crypto.createDecipheriv('aes-256-gcm', masterKey, keyIv);
+      keyDecipher.setAuthTag(keyAuthTag);
+      const symmetricKey = Buffer.concat([keyDecipher.update(wrappedKey), keyDecipher.final()]);
+
+      // 2. Decrypt the asset payload
+      // Upload layout: [16-byte authTag | 12-byte IV | ciphertext]
+      const authTag = encryptedData.subarray(0, 16);
+      const assetIv = encryptedData.subarray(16, 28);
+      const ciphertext = encryptedData.subarray(28);
+
+      const cipher = crypto.createDecipheriv('aes-256-gcm', symmetricKey, assetIv);
+      cipher.setAuthTag(authTag);
+      return Buffer.concat([cipher.update(ciphertext), cipher.final()]);
+    } catch (error) {
+      throw new Error('Decryption failed. The data or key may be corrupted.');
+    }
+  }
+
   private streamToCloudinary(buffer: Buffer, publicId: string): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
