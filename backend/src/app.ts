@@ -9,6 +9,7 @@ import express, { type Application, type Request, type Response } from "express"
 import helmet from "helmet";
 import cors from "cors";
 import { setupSwagger } from './docs/swagger';
+
 import morgan from 'morgan';
 import { env } from './config/env';
 import { corsMiddleware, apiV1RateLimiter, authRateLimiter } from './config/security';

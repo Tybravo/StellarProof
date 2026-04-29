@@ -91,3 +91,4 @@ export function setupSwagger(app: Express): void {
 
   console.log('📚 Swagger docs available at "http://localhost:4000/api-docs"');
 }
+
