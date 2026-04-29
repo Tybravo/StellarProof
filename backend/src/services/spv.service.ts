@@ -2,9 +2,11 @@ import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'clo
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import mongoose from 'mongoose';
-import SPVRecord, { ISPVRecord } from '../models/SPVRecord.model';
+import SPVRecordModel, { ISPVRecord } from '../models/SPVRecord.model';
+import { SPVRecordModel as SealSPVRecord, ISealSPVRecord } from '../models/spv.model';
 import KMSKey from '../models/KMSKey.model';
 import Asset, { IAsset } from '../models/Asset.model';
+import { AppError } from '../errors/AppError';
 
 export type SupportedStorageProvider = 'cloudinary' | 'ipfs';
 
@@ -114,7 +116,7 @@ class SPVService {
         accessPolicy: params.accessType,
       });
 
-      const spvRecord = await SPVRecord.create({
+      const spvRecord = await SPVRecordModel.create({
         assetId: asset._id,
         creatorId: params.creatorId,
         kmsKeyId: kmsKey._id,
@@ -146,7 +148,7 @@ class SPVService {
   ): Promise<ISPVRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(spvId)) return null;
 
-    const record = await SPVRecord.findById(spvId)
+    const record = await SPVRecordModel.findById(spvId)
       .populate('assetId')
       .populate('kmsKeyId', '-encryptedKeyValue -iv')
       .exec();
@@ -158,7 +160,7 @@ class SPVService {
     if (record.accessType === 'private' && !isCreator) return null;
 
     if (record.accessType === 'specific_users') {
-      const isAllowed = record.allowedUsers?.some((id) => id.equals(requestingUserId));
+      const isAllowed = record.allowedUsers?.some((id: mongoose.Types.ObjectId) => id.equals(requestingUserId));
       if (!isCreator && !isAllowed) return null;
     }
 
@@ -166,7 +168,7 @@ class SPVService {
   }
 
   async getUserSPVRecords(userId: mongoose.Types.ObjectId): Promise<ISPVRecord[]> {
-    return SPVRecord.find({ creatorId: userId })
+    return SPVRecordModel.find({ creatorId: userId })
       .populate('assetId')
       .sort({ createdAt: -1 })
       .exec();
@@ -179,7 +181,7 @@ class SPVService {
   ): Promise<ISPVRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(spvId)) return null;
 
-    const record = await SPVRecord.findOne({ _id: spvId, creatorId: userId });
+    const record = await SPVRecordModel.findOne({ _id: spvId, creatorId: userId });
     if (!record) return null;
 
     record.isSealed = isSealed;
@@ -192,7 +194,7 @@ class SPVService {
       throw new Error('Invalid SPV Record ID');
     }
 
-    const spvRecord = await SPVRecord.findById(spvId)
+    const spvRecord = await SPVRecordModel.findById(spvId)
       .populate<{ assetId: IAsset }>('assetId')
       .populate<{ kmsKeyId: any }>('kmsKeyId')
       .exec();
@@ -218,7 +220,7 @@ class SPVService {
       }
     } else if (spvRecord.accessType === 'specific_users') {
       const isCreator = asset.creatorId.equals(requestingUserId);
-      const isAllowed = spvRecord.allowedUsers?.some((id) => id.equals(requestingUserId));
+      const isAllowed = spvRecord.allowedUsers?.some((id: mongoose.Types.ObjectId) => id.equals(requestingUserId));
       if (!isCreator && !isAllowed) {
         throw new Error('Unauthorized: You do not have permission to access this asset');
       }
@@ -310,6 +312,30 @@ class SPVService {
 
       Readable.from(buffer).pipe(uploadStream);
     });
+  }
+
+  private generateKMSKey(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  public async sealAsset(assetId: string, accessType: 'private' | 'nft_holders_only'): Promise<ISealSPVRecord> {
+    const asset = await Asset.findById(assetId);
+    
+    if (!asset) {
+      throw new AppError('Asset not found', 404);
+    }
+
+    const kmsKey = this.generateKMSKey();
+
+    const spvRecord = new SealSPVRecord({
+      assetId,
+      accessType,
+      kmsKey,
+    });
+
+    await spvRecord.save();
+    
+    return spvRecord;
   }
 }
 
