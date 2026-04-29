@@ -84,6 +84,54 @@ export const uploadEncryptedAsset = async (req: Request, res: Response): Promise
   }
 };
 
+export const sealSPV = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { assetId, accessType } = req.body;
+
+    if (!assetId) {
+      res.status(400).json({
+        success: false,
+        message: 'assetId must be provided'
+      });
+      return;
+    }
+
+    if (!['private', 'nft_holders_only'].includes(accessType)) {
+      res.status(400).json({
+        success: false,
+        message: 'accessType must be private or nft_holders_only'
+      });
+      return;
+    }
+
+    const spvRecord = await spvService.sealAsset(assetId, accessType);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: spvRecord._id,
+        assetId: spvRecord.assetId,
+        accessType: spvRecord.accessType,
+        kmsKey: spvRecord.kmsKey,
+        createdAt: spvRecord.createdAt
+      }
+    });
+  } catch (error: any) {
+    if (error.statusCode === 404) {
+      res.status(404).json({
+        success: false,
+        message: error.message
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
 export const getSPVRecord = async (req: Request, res: Response): Promise<void> => {
   const { spvId } = req.params;
 
@@ -149,5 +197,35 @@ export const updateSealedStatus = async (req: Request, res: Response): Promise<v
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred';
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message });
+  }
+};
+
+export const unsealAsset = async (req: Request, res: Response): Promise<void> => {
+  const { spvId } = req.body;
+
+  if (!spvId || typeof spvId !== 'string') {
+    res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: 'Invalid or missing spvId in request body',
+    });
+    return;
+  }
+
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.id);
+    const { buffer, contentType } = await spvService.unsealAsset(spvId, userId);
+
+    res.setHeader('Content-Type', contentType);
+    res.status(StatusCodes.OK).send(buffer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+    
+    // Determine status code based on error message mapping
+    let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
+    if (message.includes('not found')) statusCode = StatusCodes.NOT_FOUND;
+    if (message.includes('Unauthorized')) statusCode = StatusCodes.FORBIDDEN;
+    if (message.includes('Invalid')) statusCode = StatusCodes.BAD_REQUEST;
+
+    res.status(statusCode).json({ success: false, message });
   }
 };
