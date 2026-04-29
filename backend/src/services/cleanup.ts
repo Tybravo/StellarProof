@@ -3,7 +3,7 @@ import Asset, { IAsset } from '../models/Asset.model';
 import { VerificationJobModel } from '../models/verificationJob.model';
 import { cloudinary } from '../config/cloudinary';
 import { CleanedAsset, CleanupResult } from '../types/cleanup';
-import { logger } from '../utils/logger';
+import logger from '../utils/logger';
 
 
 const ORPHAN_AGE_MS = (): number => {
