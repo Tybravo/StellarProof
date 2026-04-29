@@ -29,6 +29,7 @@ import {
   type OracleProvider,
   type RegistryData,
 } from "../../services/registry";
+import { ProviderList } from "../../components/registry/ProviderList";
 
 /* ------------------------------------------------------------------ */
 /*                         Constants                                   */
@@ -206,7 +207,10 @@ function TeeHashRow({ item }: { item: TeeHash }) {
             v{item.version}
           </span>
         </div>
-        <p className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate" title={item.hash}>
+        <p
+          className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate"
+          title={item.hash}
+        >
           {item.hash}
         </p>
         <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
@@ -220,58 +224,6 @@ function TeeHashRow({ item }: { item: TeeHash }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*                   Oracle Provider Row                               */
-/* ------------------------------------------------------------------ */
-
-function OracleProviderRow({ item }: { item: OracleProvider }) {
-  const addedDate = new Date(item.addedAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
-  const networkClass =
-    item.network === "Mainnet"
-      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-      : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.2 }}
-      className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-primary/40 dark:hover:border-primary/30 hover:shadow-sm transition-all"
-    >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/10 dark:bg-secondary/15">
-        <Shield className="h-4.5 w-4.5 text-secondary" aria-hidden />
-      </div>
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">
-            {item.name}
-          </span>
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${networkClass}`}
-          >
-            {item.network}
-          </span>
-        </div>
-        <p className="text-xs font-mono text-gray-500 dark:text-gray-400 truncate" title={item.address}>
-          {item.address}
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
-          <Clock className="w-3 h-3" aria-hidden />
-          Added {addedDate}
-        </p>
-      </div>
-      <CopyButton value={item.address} label={`address for ${item.name}`} />
-    </motion.div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*                      Empty State                                    */
 /* ------------------------------------------------------------------ */
 
@@ -279,7 +231,10 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center gap-3 py-12 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
-        <Search className="h-6 w-6 text-gray-400 dark:text-gray-500" aria-hidden />
+        <Search
+          className="h-6 w-6 text-gray-400 dark:text-gray-500"
+          aria-hidden
+        />
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
     </div>
@@ -355,8 +310,14 @@ export default function RegistryPage() {
     [data, normalizedSearch],
   );
 
-  const teeTotalPages = Math.max(1, Math.ceil(filteredTeeHashes.length / PAGE_SIZE));
-  const oracleTotalPages = Math.max(1, Math.ceil(filteredOracleProviders.length / PAGE_SIZE));
+  const teeTotalPages = Math.max(
+    1,
+    Math.ceil(filteredTeeHashes.length / PAGE_SIZE),
+  );
+  const oracleTotalPages = Math.max(
+    1,
+    Math.ceil(filteredOracleProviders.length / PAGE_SIZE),
+  );
 
   const pagedTeeHashes = filteredTeeHashes.slice(
     (teePage - 1) * PAGE_SIZE,
@@ -378,7 +339,10 @@ export default function RegistryPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans selection:bg-primary/30">
       <Header />
 
-      <main id="main-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <main
+        id="main-content"
+        className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12"
+      >
         {/* Page header */}
         <div className="mb-10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
@@ -441,9 +405,14 @@ export default function RegistryPage() {
         {/* Error state */}
         {error && (
           <div className="mb-8 flex items-start gap-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4">
-            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden />
+            <AlertCircle
+              className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5"
+              aria-hidden
+            />
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-300">{error}</p>
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                {error}
+              </p>
               <button
                 type="button"
                 onClick={handleRefresh}
@@ -532,31 +501,16 @@ export default function RegistryPage() {
             </div>
 
             <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.02] p-4 space-y-4">
-              {loading ? (
-                <ListSkeleton rows={PAGE_SIZE} />
-              ) : (
-                <>
-                  <AnimatePresence mode="popLayout">
-                    {pagedOracleProviders.length > 0 ? (
-                      pagedOracleProviders.map((item) => (
-                        <OracleProviderRow key={item.id} item={item} />
-                      ))
-                    ) : (
-                      <EmptyState
-                        message={
-                          search
-                            ? `No oracle providers matching "${search}"`
-                            : "No oracle providers found"
-                        }
-                      />
-                    )}
-                  </AnimatePresence>
-                  <Pagination
-                    page={oraclePage}
-                    totalPages={oracleTotalPages}
-                    onPage={setOraclePage}
-                  />
-                </>
+              <ProviderList
+                providers={pagedOracleProviders}
+                isLoading={loading}
+              />
+              {!loading && (
+                <Pagination
+                  page={oraclePage}
+                  totalPages={oracleTotalPages}
+                  onPage={setOraclePage}
+                />
               )}
             </div>
           </section>
