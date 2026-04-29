@@ -69,7 +69,7 @@ export default function Hero() {
           className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
         >
           <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg hover:shadow-blue-500/50">
-            Get Started
+            Launch App
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
           <button className="px-8 py-3 border-2 border-gray-500/50 hover:border-gray-300 text-gray-300 hover:text-white font-semibold rounded-lg transition-all duration-300 hover:bg-white/5">
