@@ -5,7 +5,8 @@ import {
   uploadEncryptedAsset,
   getSPVRecord,
   getUserSPVRecords,
-  updateSealedStatus
+  updateSealedStatus,
+  unsealAsset
 } from '../controllers/spv.controller';
 
 const router = Router();
