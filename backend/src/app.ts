@@ -12,6 +12,11 @@ import { corsMiddleware, apiV1RateLimiter, authRateLimiter } from './config/secu
 import rootRouter from './routes';
 import { globalErrorHandler } from './middlewares/errorHandler';
 
+
+
+
+
+
 export function createApp(): Application {
   const app = express();
 
