@@ -4,8 +4,11 @@
  * Kept separate from the server entry point so the app can be imported in
  * tests without binding a network port.
  */
-import express, { type Application, type Request, type Response } from 'express';
-import helmet from 'helmet';
+
+import express, { type Application, type Request, type Response } from "express";
+import helmet from "helmet";
+import cors from "cors";
+import { setupSwagger } from './docs/swagger';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { corsMiddleware, apiV1RateLimiter, authRateLimiter } from './config/security';
@@ -39,7 +42,11 @@ export function createApp(): Application {
   // ── Application routes ────────────────────────────────────────────────────
   app.use(rootRouter);
 
-  // ── 404 handler ───────────────────────────────────────────────────────────
+  setupSwagger(app); // ← add this
+
+  // -------------------------------------------------------------------------
+  // 404 handler – catch unmatched routes
+  // -------------------------------------------------------------------------
   app.use((_req: Request, res: Response): void => {
     res.status(404).json({
       success: false,
@@ -51,5 +58,25 @@ export function createApp(): Application {
   // Must be registered last so it catches errors from all middleware above.
   app.use(globalErrorHandler);
 
+
+
   return app;
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -25,6 +25,7 @@ const upload = multer({
  * POST /api/v1/spv/records/upload
  * Upload a file with SPV encryption
  */
+
 router.post(
   '/upload',
   protect,
@@ -40,6 +41,7 @@ router.post(
 router.get('/records/user', protect, getUserSPVRecords);
 
 /**
+
  * GET /api/v1/spv/records/:spvId
  * Get SPV record by ID
  */
@@ -50,6 +52,7 @@ router.get('/:spvId', protect, getSPVRecord);
  * Update the sealed status of an SPV record
  */
 router.patch('/records/:id/seal', protect, updateSealedStatus);
+
 
 /**
  * POST /api/v1/spv/seal

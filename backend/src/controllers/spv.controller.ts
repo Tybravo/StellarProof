@@ -81,6 +81,7 @@ export const uploadEncryptedAsset = async (req: Request, res: Response): Promise
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred';
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message });
+
   }
 };
 
@@ -197,6 +198,7 @@ export const updateSealedStatus = async (req: Request, res: Response): Promise<v
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred';
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message });
+
   }
 };
 
@@ -229,3 +231,4 @@ export const unsealAsset = async (req: Request, res: Response): Promise<void> =>
     res.status(statusCode).json({ success: false, message });
   }
 };
+
