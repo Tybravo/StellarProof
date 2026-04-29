@@ -199,3 +199,33 @@ export const updateSealedStatus = async (req: Request, res: Response): Promise<v
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ success: false, message });
   }
 };
+
+export const unsealAsset = async (req: Request, res: Response): Promise<void> => {
+  const { spvId } = req.body;
+
+  if (!spvId || typeof spvId !== 'string') {
+    res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: 'Invalid or missing spvId in request body',
+    });
+    return;
+  }
+
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.id);
+    const { buffer, contentType } = await spvService.unsealAsset(spvId, userId);
+
+    res.setHeader('Content-Type', contentType);
+    res.status(StatusCodes.OK).send(buffer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+    
+    // Determine status code based on error message mapping
+    let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
+    if (message.includes('not found')) statusCode = StatusCodes.NOT_FOUND;
+    if (message.includes('Unauthorized')) statusCode = StatusCodes.FORBIDDEN;
+    if (message.includes('Invalid')) statusCode = StatusCodes.BAD_REQUEST;
+
+    res.status(statusCode).json({ success: false, message });
+  }
+};
