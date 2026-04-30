@@ -1,45 +1,66 @@
-/**
- * Manifest Controller – thin HTTP adapter layer.
- *
- * Each method:
- *  1. Extracts validated data from the request (query params are already
- *     validated by middleware before reaching here).
- *  2. Delegates to the service layer.
- *  3. Wraps the result in the standard ApiResponse envelope.
- *  4. Forwards any errors to the global error handler via `next(err)`.
- *
- * No business logic lives here.
- */
-import type { Request, Response, NextFunction } from "express";
-import { StatusCodes } from "http-status-codes";
-import { manifestService } from "../services/manifest.service";
-import type { ListManifestsQuery } from "../types/manifest.types";
+import { Request, Response, NextFunction } from 'express';
+import { StatusCodes } from 'http-status-codes';
+import { manifestService } from '../services/manifest.service';
+import type { ListManifestsQuery } from '../types/manifest.types';
 
-export class ManifestController {
+class ManifestController {
   /**
-   * GET /api/v1/manifests?ownerPublicKey=G...&limit=20&skip=0
-   * Returns a paginated list of manifests for the authenticated owner.
+   * GET /api/v1/manifests
    */
-  async listManifests(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  public async listManifests(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const query: ListManifestsQuery = {
-        ownerPublicKey: req.query.ownerPublicKey as string,
-        limit: Number(req.query.limit),
-        skip: Number(req.query.skip),
-      };
-
+      // req.query is already validated and coerced by the Zod middleware in the router
+      const query = req.query as unknown as ListManifestsQuery;
+      
       const result = await manifestService.listManifests(query);
-
+      
       res.status(StatusCodes.OK).json({
         success: true,
         data: result,
       });
-    } catch (err) {
-      next(err);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/manifests
+   */
+  public async createManifest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const manifestPayload = req.body;
+
+      if (!manifestPayload || typeof manifestPayload !== 'object') {
+        res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: 'Valid manifest data payload is required',
+        });
+        return;
+      }
+
+      const savedManifest = await manifestService.createManifest(manifestPayload);
+
+      res.status(StatusCodes.CREATED).json({
+        success: true,
+        message: 'Manifest created and hashed deterministically',
+        data: {
+          id: savedManifest._id,
+          manifestHash: savedManifest.manifestHash,
+          contentHash: savedManifest.contentHash,
+          createdAt: savedManifest.createdAt,
+        },
+      });
+    } catch (error: any) {
+      // Handle MongoDB unique index violations (e.g., exact same manifest submitted twice)
+      if (error.code === 11000) {
+        res.status(StatusCodes.CONFLICT).json({
+          success: false,
+          error: 'A manifest with this exact data and hash already exists',
+        });
+        return;
+      }
+      
+      next(error);
     }
   }
 }
