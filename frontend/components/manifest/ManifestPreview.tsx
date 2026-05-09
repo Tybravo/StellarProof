@@ -7,6 +7,7 @@ import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-markup'; 
 import { FormatToggle, ManifestFormat } from './FormatToggle';
+import DownloadActions from './DownloadActions';
 import { ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export interface ManifestData {
@@ -94,46 +95,53 @@ export const ManifestPreview = ({ manifestData }: { manifestData: ManifestData }
     <div className="flex flex-col h-[500px] bg-[#0d1117] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
       <div className="flex justify-between items-center p-3 bg-[#161b22] border-b border-gray-800">
         <div className="flex items-center gap-2">
-           <div className="flex gap-1.5 px-2">
+           <div className="flex gap-1.5 px-2" aria-hidden="true">
              <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
              <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
              <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
            </div>
-           {/* Sharp Technical Typography */}
-           <span className="text-[10px] font-mono text-gray-400 font-bold tracking-[0.25em] uppercase leading-none">
+           <span className="text-[10px] font-mono text-gray-400 font-bold tracking-[0.25em] uppercase leading-none" aria-hidden="true">
              preview.{format}
            </span>
         </div>
         <div className="flex items-center gap-3">
           <FormatToggle currentFormat={format} onFormatChange={setFormat} />
-          <button 
+          <button
+            type="button"
             onClick={handleCopy}
             disabled={!!error}
-            className={`p-1.5 rounded-md transition-all active:scale-95 ${
+            aria-label={copied ? "Copied to clipboard" : `Copy ${format.toUpperCase()} to clipboard`}
+            className={`p-1.5 rounded-md transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
               error ? 'opacity-20 cursor-not-allowed' : 'text-gray-400 hover:bg-gray-700'
             }`}
           >
-            {copied ? <CheckIcon className="w-4 h-4 text-green-500" /> : <ClipboardDocumentIcon className="w-4 h-4" />}
+            {copied
+              ? <CheckIcon className="w-4 h-4 text-green-500" aria-hidden="true" />
+              : <ClipboardDocumentIcon className="w-4 h-4" aria-hidden="true" />}
           </button>
         </div>
       </div>
 
       <div className="relative flex-1 overflow-hidden flex font-mono text-[13px]">
         {error ? (
-          <div className="flex flex-col items-center justify-center w-full h-full p-8 text-center bg-[#0d1117]">
-             <ExclamationTriangleIcon className="w-10 h-10 text-amber-500 mb-3 opacity-80" />
+          <div role="status" aria-live="polite" className="flex flex-col items-center justify-center w-full h-full p-8 text-center bg-[#0d1117]">
+             <ExclamationTriangleIcon className="w-10 h-10 text-amber-500 mb-3 opacity-80" aria-hidden="true" />
              <h3 className="text-gray-200 font-semibold">Preview Unavailable</h3>
+             <p className="mt-1 text-sm text-gray-400">{error}</p>
           </div>
         ) : (
           <>
-            <div className="py-4 px-3 text-right bg-[#0d1117] border-r border-gray-800 select-none text-gray-600 min-w-[3.5rem]">
+            <div className="py-4 px-3 text-right bg-[#0d1117] border-r border-gray-800 select-none text-gray-600 min-w-[3.5rem]" aria-hidden="true">
               {formattedOutput.split('\n').map((_, i) => (
                 <div key={i} className="leading-relaxed">{i + 1}</div>
               ))}
             </div>
 
-            <pre 
+            <pre
               ref={scrollRef}
+              role="region"
+              aria-label={`Manifest preview in ${format.toUpperCase()} format`}
+              tabIndex={0}
               className={`flex-1 p-4 m-0 overflow-auto custom-scrollbar ${langClass}`}
               style={{ backgroundColor: 'transparent' }}
             >
@@ -143,6 +151,14 @@ export const ManifestPreview = ({ manifestData }: { manifestData: ManifestData }
             </pre>
           </>
         )}
+      </div>
+
+      <div className="flex justify-end p-3 bg-[#161b22] border-t border-gray-800">
+        <DownloadActions 
+          content={formattedOutput}
+          format={format}
+          isDisabled={!!error}
+        />
       </div>
     </div>
   );

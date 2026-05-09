@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { generateDeterministicHash } from '../utils/crypto';
 
 /**
  * Manifest Interface
@@ -55,8 +56,6 @@ const ManifestSchema: Schema = new Schema(
       type: String,
       unique: true,
       sparse: true,
-      // Contributors: Implement a pre-save hook to calculate the deterministic hash 
-      // of the manifest JSON before saving to the database.
     }
   },
   { 
@@ -64,5 +63,35 @@ const ManifestSchema: Schema = new Schema(
     strict: false // Allows dynamic keys inside metadata
   }
 );
+
+// --- Pre-save hook for deterministic hashing ---
+ManifestSchema.pre<IManifest>('save', function (next) {
+  // Only recalculate the hash if relevant content fields have been modified
+  if (
+    this.isModified('contentHash') ||
+    this.isModified('creator') ||
+    this.isModified('creatorId') ||
+    this.isModified('timestamp') ||
+    this.isModified('metadata')
+  ) {
+    try {
+      // Construct the payload to hash. 
+      // We explicitly exclude _id, __v, createdAt, and updatedAt 
+      // so the hash is purely based on the core business data.
+      const payloadToHash = {
+        contentHash: this.contentHash,
+        creator: this.creator,
+        creatorId: this.creatorId ? this.creatorId.toString() : undefined,
+        timestamp: this.timestamp ? this.timestamp.toISOString() : undefined,
+        metadata: this.metadata || {},
+      };
+
+      this.manifestHash = generateDeterministicHash(payloadToHash);
+    } catch (error) {
+      return next(error as Error);
+    }
+  }
+  next();
+});
 
 export default mongoose.model<IManifest>('Manifest', ManifestSchema);

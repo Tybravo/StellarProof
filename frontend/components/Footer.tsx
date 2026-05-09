@@ -1,12 +1,8 @@
 "use client";
 
-// import { useTheme } from "@/app/context/ThemeContext";
-import { useTheme } from "../app/context/ThemeContext";
-
-
-// import { ThemeProvider } from './context/ThemeContext';
 import { Github, Twitter, Send, DiscIcon } from "lucide-react";
-
+import Link from "next/link";
+  
 function LogoIcon() {
   return (
     <div
@@ -41,10 +37,6 @@ function LogoIcon() {
 }
 
 export default function Footer() {
-  const { theme } = useTheme();
-
-  // Define theme‑dependent classes
-  const isDark = theme === "dark" || true; // Always use dark theme
   const bgGradient = "from-darkblue-dark via-darkblue to-darkblue-dark";
   const textPrimary = "text-white";
   const textSecondary = "text-gray-300";
@@ -54,19 +46,20 @@ export default function Footer() {
 
   return (
     <footer
+      aria-label="Site footer"
       className={`bg-gradient-to-b ${bgGradient} ${textSecondary} px-6 py-16 lg:px-16 transition-colors duration-300`}
     >
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
           {/* Brand Section */}
           <div className="md:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
+            <Link href="/#home" className="flex items-center gap-3 mb-4 group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1120]">
               <LogoIcon />
-              <div className="flex gap-1">
+              <div className="flex gap-1 group-hover:opacity-80 transition-opacity">
                 <span className="text-xl font-bold text-blue-400">Stellar</span>
                 <span className="text-xl font-bold text-pink-400">Proof</span>
               </div>
-            </div>
+            </Link>
             <p
               className={`text-sm leading-relaxed mb-6 max-w-xs ${textSecondary}`}
             >
@@ -75,15 +68,22 @@ export default function Footer() {
               contracts.
             </p>
             {/* Social Icons */}
-            <div className="flex gap-4">
-              {[DiscIcon, Github, Twitter, Send].map((Icon, idx) => (
+            <div className="flex gap-4" aria-label="Social media links">
+              {([
+                { Icon: DiscIcon, label: "StellarProof on Discord", href: "https://discord.com/" },
+                { Icon: Github, label: "StellarProof on GitHub", href: "https://github.com/" },
+                { Icon: Twitter, label: "StellarProof on X", href: "https://x.com/" },
+                { Icon: Send, label: "StellarProof on Telegram", href: "https://web.telegram.org/a/" },
+              ] as const).map(({ Icon, label, href }) => (
                 <a
-                  key={idx}
-                  href="#"
-                  className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors`}
-                  aria-label="Social"
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black`}
+                  aria-label={label}
                 >
-                  <Icon className={`w-5 h-5 ${iconColor}`} />
+                  <Icon className={`w-5 h-5 ${iconColor}`} aria-hidden="true" />
                 </a>
               ))}
             </div>
@@ -136,22 +136,23 @@ export default function Footer() {
               >
                 {section.title}
               </h3>
-              <nav className="space-y-3">
+              <nav aria-label={section.title} className="space-y-3">
                 {section.links.map((link) => {
-                  const href =
-                    link === "Report an Issue"
-                      ? "/report-issue"
-                      : link === "Contact Us"
-                        ? "/contact"
-                        : "#";
+                  let href = "#";
+                  if (link === "Report an Issue") href = "/report-issue";
+                  else if (link === "Contact Us") href = "/contact";
+                  else if (link === "What is StellarProof") href = "/#home";
+                  else if (link === "How It Works") href = "/#how-it-works";
+                  else if (link === "Core Technology") href = "/#about";
+                  
                   return (
-                    <a
+                    <Link
                       key={link}
                       href={href}
                       className={`text-sm ${textSecondary} hover:text-blue-300 transition-colors block`}
                     >
                       {link}
-                    </a>
+                    </Link>
                   );
                 })}
               </nav>

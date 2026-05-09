@@ -14,6 +14,7 @@ export interface IKMSKey extends Document {
   algorithm: string;           // e.g., AES-256-GCM
   encryptedKeyValue: string;   // The actual symmetric key, encrypted by a master key before saving!
   iv: string;                  // Initialization Vector used during key encryption
+  authTag: string;             // Authentication tag for GCM mode
   isActive: boolean;
   expiresAt?: Date;            // Optional expiration for time-limited access
   
@@ -46,6 +47,10 @@ const KMSKeySchema: Schema = new Schema(
       // by a server-side Master Key (stored in .env) before hitting the DB.
     },
     iv: {
+      type: String,
+      required: true,
+    },
+    authTag: {
       type: String,
       required: true,
     },

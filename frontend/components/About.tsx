@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ShieldCheck, Layers, Cpu, Database } from "lucide-react";
+import Link from "next/link";
 
 export default function About() {
     const containerVariants = {
@@ -188,9 +189,9 @@ export default function About() {
                         Ready to secure your digital footprint?
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                        <button className="px-6 py-3 rounded-lg bg-secondary text-secondary-foreground font-semibold hover:bg-secondary-light transition-colors hover:shadow-button-glow-secondary w-full sm:w-auto cursor-pointer">
-                            Get Started
-                        </button>
+                        <Link href="/launch" className="px-6 py-3 rounded-lg bg-secondary text-secondary-foreground font-semibold hover:bg-secondary-light transition-colors hover:shadow-button-glow-secondary w-full sm:w-auto text-center cursor-pointer">
+                            Launch App
+                        </Link>
                         <button className="px-6 py-3 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-semibold hover:bg-gray-200 dark:hover:bg-white/20 transition-colors border border-gray-200 dark:border-white/10 w-full sm:w-auto cursor-pointer">
                             Read Documentation
                         </button>

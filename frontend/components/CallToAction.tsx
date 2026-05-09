@@ -49,7 +49,7 @@ export default function CallToAction() {
           </h2>
 
           {/* Subtext */}
-          <p className="text-base md:text-lg text-gray-600 dark:text-white/60 mb-10 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-gray-600 dark:text-white/80 mb-10 max-w-2xl mx-auto">
             Join the ecosystem of creators and developers leveraging StellarProof to secure, verify, and immortalize digital assets with zero-trust architecture.
           </p>
 
@@ -58,10 +58,10 @@ export default function CallToAction() {
             
         
             <Link 
-              href="/register" 
+              href="/launch" 
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-primary text-white font-semibold hover:bg-blue-600 transition-colors shadow-button-glow"
             >
-              Get Started
+              Launch App
               <ArrowRight className="w-5 h-5" />
             </Link>
             

@@ -64,21 +64,28 @@ function ToastContainer({
   toasts: Toast[];
   onRemove: (id: string) => void;
 }) {
-  if (!toasts.length) return null;
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 min-w-[260px]">
+    <div
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
+      className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 min-w-[260px] pointer-events-none"
+    >
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-center justify-between rounded-lg px-4 py-3 shadow-lg text-sm font-medium ${TYPE_STYLES[t.type]}`}
+          role="status"
+          className={`flex items-center justify-between rounded-lg px-4 py-3 shadow-lg text-sm font-medium pointer-events-auto ${TYPE_STYLES[t.type]}`}
         >
           <span>{t.message}</span>
           <button
+            type="button"
             onClick={() => onRemove(t.id)}
-            className="ml-4 opacity-70 hover:opacity-100 transition-opacity"
-            aria-label="Dismiss"
+            className="ml-4 opacity-70 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
+            aria-label={`Dismiss notification: ${t.message}`}
           >
-            ✕
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
       ))}

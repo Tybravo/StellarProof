@@ -1,0 +1,48 @@
+"use client";
+
+import RequestRow from "@/components/dashboard/RequestRow";
+
+// Define the interface to match what RequestRow expects
+interface RequestData {
+  id: string;
+  hash: string;
+  fullHash: string;
+  manifest: string;
+  attestation: string;
+  timestamp: string;
+  txHash: string;
+  certificateUrl: string;
+  status: "verified" | "pending" | "failed"; // Match the expected status types
+}
+
+const mockRequest: RequestData = {
+  id: "1",
+  hash: "0x1234567890abcdef1234567890abcdef",
+  fullHash:
+    "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  manifest: JSON.stringify(
+    { name: "Example Manifest", version: "1.0" },
+    null,
+    2,
+  ),
+  attestation: JSON.stringify(
+    { verifier: "TEE-Oracle", result: "ok" },
+    null,
+    2,
+  ),
+  timestamp: new Date().toISOString(),
+  txHash: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  certificateUrl: "https://example.com/certificate/1",
+  status: "verified",
+};
+
+export default function Page() {
+  return (
+    <div className="p-8 bg-gray-500 min-h-screen">
+      <div className="max-w-2xl mx-auto">
+        {/* Fixed: Removed 'as any' and used the typed mockRequest */}
+        <RequestRow request={mockRequest} />
+      </div>
+    </div>
+  );
+}
