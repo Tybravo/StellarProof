@@ -82,7 +82,7 @@ export function VaultActions({ item }: VaultActionsProps) {
           onClick={() => setShowConfirm(true)}
           disabled={isDownloading}
           className={cn(
-            "p-1.5 rounded-lg transition-colors flex items-center justify-center min-w-[32px] min-h-[32px]",
+            "p-1.5 rounded-lg transition-colors flex items-center justify-center min-w-8 min-h-8",
             "text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10",
             isDownloading && "opacity-50 cursor-not-allowed",
           )}
