@@ -89,35 +89,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setConnectError(null), []);
 
-  const connect = useCallback(async () => {
-    setConnectError(null);
-    const installed = await walletService.isInstalled();
-    if (!installed) {
-      setConnectError("Freighter is not installed.");
+ const connect = useCallback(async () => {
+  setConnectError(null);
+  const installed = await walletService.isInstalled();
+  if (!installed) {
+    setConnectError("Freighter is not installed. Please install the Freighter extension to connect your wallet.");
+    return;
+  }
+  setIsConnecting(true);
+  try {
+    // requestAccess() triggers the Freighter popup — getAddress() does not
+    const result = await walletService.requestAccess();
+    if (result.error) {
+      setConnectError(result.error);
       return;
     }
-    setIsConnecting(true);
-    try {
-      const address = await walletService.getAddress();
-      if (address) {
-        setPublicKey(address);
-        setIsConnected(true);
-        setConnectError(null);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, address);
-          localStorage.setItem("walletConnected", "true");
-        }
-        const details = await walletService.getNetworkDetails();
-        setNetworkDetails(details);
+    if (result.address) {
+      setPublicKey(result.address);
+      setIsConnected(true);
+      setConnectError(null);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, result.address);
+        localStorage.setItem("walletConnected", "true");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to connect.";
-      setConnectError(message);
-    } finally {
-      setIsConnecting(false);
+      const details = await walletService.getNetworkDetails();
+      setNetworkDetails(details);
     }
-  }, []);
-
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to connect.";
+    setConnectError(message);
+  } finally {
+    setIsConnecting(false);
+  }
+}, []);
   const disconnect = useCallback(() => {
     setPublicKey(null);
     setIsConnected(false);
