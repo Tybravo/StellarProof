@@ -7,7 +7,7 @@ By leveraging Stellar’s ultra-low transaction fees (~0.00001 XLM), fast 3–5 
 StellarProof provides **Proof-as-a-Service APIs**, allowing any application to verify content origin, integrity, and authenticity using a hybrid **Web2 + Web3 verification pipeline**. StellarProof transforms the Stellar network into a **truth engine** for digital media.
 
 ---
-
+1
 ## 🔑 Quick Summary
 
 | Property                      | Value                                              |
