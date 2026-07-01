@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Calendar,
   ChevronLeft,
@@ -15,6 +15,7 @@ import {
 import Header from "../../components/Header";
 import { useWallet } from "@/context/WalletContext";
 import { cn } from "../../utils/cn";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 import { VaultActions } from "../../components/vault/VaultActions";
 import { DecryptionPreview } from "../../components/vault/DecryptionPreview";
@@ -414,6 +415,68 @@ function Pagination({ page, totalPages, onPage }: PaginationProps) {
 /*                           Main Page                                 */
 /* ------------------------------------------------------------------ */
 
+function VaultSkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Controls skeleton */}
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-4">
+        {/* Search */}
+        <Skeleton className="h-11 w-full rounded-xl" />
+        {/* Date range */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-10" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+          </div>
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-8" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      {/* Table skeleton */}
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-white/[0.02]">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <th key={i} scope="col" className="px-4 py-3">
+                    <Skeleton className="h-4 w-20" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <Skeleton className="h-4 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Footer skeleton */}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4 flex-wrap">
+          <Skeleton className="h-4 w-48" />
+          <div className="flex items-center gap-1">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-8 rounded-lg" />
+            ))}
+            <Skeleton className="h-8 w-8 rounded-lg" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VaultPage() {
   const { isConnected, connect } = useWallet();
 
@@ -421,6 +484,17 @@ export default function VaultPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isConnected) {
+      setIsLoading(true);
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -501,6 +575,8 @@ export default function VaultPage() {
           <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60">
             <WalletGuard onConnect={connect} />
           </div>
+        ) : isLoading ? (
+          <VaultSkeleton />
         ) : (
           <div className="space-y-4">
             {/* Controls */}

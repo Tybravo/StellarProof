@@ -8,6 +8,7 @@ import {
   type VerificationStatus,
 } from "@/services/verificationService";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
@@ -17,13 +18,18 @@ function truncateHash(hash: string): string {
 
 function StatusBadge({ status }: { status: VerificationStatus }) {
   const styles: Record<VerificationStatus, string> = {
-    verified: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    processing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    verified:
+      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    pending:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    processing:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${styles[status]}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${styles[status]}`}
+    >
       {status}
     </span>
   );
@@ -33,8 +39,16 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        <svg
+          className="h-8 w-8 text-primary"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
             d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
           />
         </svg>
@@ -43,7 +57,8 @@ function EmptyState() {
         No verification requests yet
       </h3>
       <p className="mb-6 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-        You haven&apos;t submitted any verification requests. Start by verifying your first piece of content.
+        You haven&apos;t submitted any verification requests. Start by verifying
+        your first piece of content.
       </p>
       <Link
         href="/verify"
@@ -59,8 +74,16 @@ function WalletPrompt() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        <svg
+          className="h-8 w-8 text-primary"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
             d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
           />
         </svg>
@@ -77,6 +100,70 @@ function WalletPrompt() {
       >
         Go to Home to Connect
       </Link>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Controls skeleton */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-8 w-12 rounded" />
+          <Skeleton className="h-8 w-12 rounded" />
+          <Skeleton className="h-8 w-12 rounded" />
+        </div>
+      </div>
+
+      {/* Desktop Table skeleton */}
+      <div className="hidden overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 sm:block">
+        <div className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 p-4 grid grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-20" />
+          ))}
+        </div>
+        <div className="divide-y divide-gray-200 dark:divide-white/10">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 grid grid-cols-5 gap-4">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-4 w-12" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile Cards skeleton */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue p-4 shadow-sm space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-28" />
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-24 rounded-lg" />
+          <Skeleton className="h-10 w-20 rounded-lg" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -115,12 +202,12 @@ export default function DashboardPage() {
 
   const totalPages = useMemo(
     () => Math.ceil(requests.length / pageSize),
-    [requests.length, pageSize]
+    [requests.length, pageSize],
   );
 
   const paginated = useMemo(
     () => requests.slice((page - 1) * pageSize, page * pageSize),
-    [requests, page, pageSize]
+    [requests, page, pageSize],
   );
 
   const handlePageSizeChange = (size: number) => {
@@ -145,12 +232,7 @@ export default function DashboardPage() {
         {!isConnected ? (
           <WalletPrompt />
         ) : isLoading ? (
-          <div className="flex items-center justify-center py-24">
-            <svg className="h-8 w-8 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-            </svg>
-          </div>
+          <DashboardSkeleton />
         ) : requests.length === 0 ? (
           <EmptyState />
         ) : (
@@ -158,7 +240,8 @@ export default function DashboardPage() {
             {/* Controls */}
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {requests.length} request{requests.length !== 1 ? "s" : ""} found
+                {requests.length} request{requests.length !== 1 ? "s" : ""}{" "}
+                found
               </p>
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <span>Rows per page:</span>
@@ -183,7 +266,13 @@ export default function DashboardPage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-white/10">
                 <thead className="bg-gray-50 dark:bg-white/5">
                   <tr>
-                    {["Date", "Request ID", "Content Hash", "Status", "Actions"].map((h) => (
+                    {[
+                      "Date",
+                      "Request ID",
+                      "Content Hash",
+                      "Status",
+                      "Actions",
+                    ].map((h) => (
                       <th
                         key={h}
                         className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
@@ -195,7 +284,10 @@ export default function DashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-white/10 bg-white dark:bg-darkblue">
                   {paginated.map((req) => (
-                    <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <tr
+                      key={req.id}
+                      className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    >
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                         {req.date}
                       </td>
@@ -235,7 +327,9 @@ export default function DashboardPage() {
                     </span>
                     <StatusBadge status={req.status} />
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{req.date}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    {req.date}
+                  </p>
                   <p className="font-mono text-xs text-gray-500 dark:text-gray-400 mb-3">
                     {truncateHash(req.contentHash)}
                   </p>
