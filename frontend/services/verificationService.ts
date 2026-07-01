@@ -1,3 +1,13 @@
+import {
+  Contract,
+  SorobanRpc,
+  TransactionBuilder,
+  Networks,
+  BASE_FEE,
+  Address,
+  nativeToScVal,
+} from "@stellar/stellar-sdk";
+
 export interface SubmissionResult {
   txHash: string;
   requestId: string;
@@ -8,30 +18,89 @@ export interface SubmissionResult {
  * @param contentHash The SHA-256 hash of the content to verify
  * @param manifestHash Optional hash of the associated manifest metadata
  * @param publicKey The user's connected Stellar public key
+ * @param signTx Function to sign transaction XDR using wallet
+ * @param networkPassphrase Network passphrase for the Stellar network
  */
 export const submitVerificationRequest = async (
   contentHash: string,
   manifestHash: string | null,
-  publicKey: string
+  publicKey: string,
+  signTx: (xdr: string) => Promise<string>,
+  networkPassphrase: string
 ): Promise<SubmissionResult> => {
-  void publicKey;
+  const rpcUrl = process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+  const contractId = process.env.NEXT_PUBLIC_ORACLE_CONTRACT_ID;
 
-  // 1. MOCK IMPLEMENTATION (For Development/UI Testing)
-  // In a real scenario, we'd fetch the network passphrase and contract ID from env
-  console.log("Constructing Soroban transaction for:", { contentHash, manifestHash });
-
-  // Simulate network latency
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  // Randomly simulate a user rejection for testing (10% chance)
-  if (Math.random() < 0.1) {
-    throw new Error("User declined the signing request");
+  if (!contractId) {
+    throw new Error("Oracle contract ID not configured");
   }
 
-  // Return mock success data
+  // Initialize Soroban RPC server
+  const server = new SorobanRpc.Server(rpcUrl);
+
+  // Get account sequence number
+  const account = await server.getAccount(publicKey);
+
+  // Prepare content hash as BytesN<32>
+  // Remove 0x prefix if present
+  const cleanHash = contentHash.startsWith("0x") ? contentHash.slice(2) : contentHash;
+  const hashBuffer = Buffer.from(cleanHash, "hex");
+  const contentHashVal = nativeToScVal(hashBuffer, { type: "bytes32" });
+
+  // Build transaction
+  const contract = new Contract(contractId);
+  const transaction = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase,
+  })
+    .addOperation(contract.call("submit_request", contentHashVal))
+    .setTimeout(30)
+    .build();
+
+  // Prepare transaction with Soroban RPC
+  const preparedTx = await server.prepareTransaction(transaction);
+
+  // Sign transaction
+  const signedXdr = await signTx(preparedTx.toXDR());
+
+  // Submit transaction
+  const submitResponse = await server.sendTransaction(
+    TransactionBuilder.fromXDR(signedXdr, networkPassphrase)
+  );
+
+  if (submitResponse.status !== "PENDING") {
+    throw new Error(`Failed to submit transaction: ${submitResponse.status}`);
+  }
+
+  // Poll for transaction status
+  let getTxResponse;
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  while (attempts < maxAttempts) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    getTxResponse = await server.getTransaction(submitResponse.hash);
+
+    if (getTxResponse.status !== SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) {
+      break;
+    }
+    attempts++;
+  }
+
+  if (!getTxResponse || getTxResponse.status === SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) {
+    throw new Error("Transaction not found after polling");
+  }
+
+  if (getTxResponse.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+    throw new Error(`Transaction failed: ${getTxResponse.resultMetaXdr}`);
+  }
+
+  // Parse request ID from transaction result
+  const requestId = getTxResponse.returnValue?.value().toString() || "";
+
   return {
-    txHash: "abc123mockTransactionHash789xyz",
-    requestId: `req-${Math.random().toString(36).substring(7)}`,
+    txHash: submitResponse.hash,
+    requestId,
   };
 };
 

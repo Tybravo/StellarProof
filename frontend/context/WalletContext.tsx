@@ -40,11 +40,14 @@ export function useWallet() {
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isFreighterInstalled, setIsFreighterInstalled] = useState<boolean>(false);
+  const [isFreighterInstalled, setIsFreighterInstalled] =
+    useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [networkDetails, setNetworkDetails] = useState<NetworkDetails | null>(null);
+  const [networkDetails, setNetworkDetails] = useState<NetworkDetails | null>(
+    null,
+  );
 
   const refreshNetwork = useCallback(async () => {
     try {
@@ -68,7 +71,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return;
-    const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    const saved =
+      typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (!saved) return;
     walletService.getAddress().then((address) => {
       if (address && address === saved) {
@@ -126,30 +130,45 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const signTx = useCallback(async (xdr: string): Promise<string> => {
-    void xdr;
-    return "";
-  }, []);
+  const signTx = useCallback(
+    async (xdr: string): Promise<string> => {
+      const { signTransaction } = await import("@stellar/freighter-api");
+      const result = await signTransaction(xdr, {
+        networkPassphrase: networkDetails?.networkPassphrase,
+      });
+      if (result.error) {
+        throw new Error(result.error || "Failed to sign transaction");
+      }
+      return result.signedTransactionXdr;
+    },
+    [networkDetails],
+  );
 
   // Auto-connect effect
   useEffect(() => {
     if (!mounted) return;
-    
-    const isStoredConnected = typeof window !== "undefined" ? localStorage.getItem("walletConnected") === "true" : false;
+
+    const isStoredConnected =
+      typeof window !== "undefined"
+        ? localStorage.getItem("walletConnected") === "true"
+        : false;
     if (!isStoredConnected) return;
 
     // Check if installed before trying to auto-connect
     walletService.isInstalled().then((installed) => {
       if (installed) {
-         walletService.getAddress().then((address) => {
+        walletService
+          .getAddress()
+          .then((address) => {
             if (address) {
               setPublicKey(address);
               setIsConnected(true);
             } else {
-               // If we can't get address despite stored connection, clear storage
-               disconnect();
+              // If we can't get address despite stored connection, clear storage
+              disconnect();
             }
-         }).catch(() => disconnect());
+          })
+          .catch(() => disconnect());
       }
     });
   }, [mounted, disconnect]);
