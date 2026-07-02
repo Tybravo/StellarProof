@@ -69,6 +69,10 @@ export const VALID_TRANSITIONS: Readonly<
 export interface IVerificationJob {
   _id?: string;
 
+  /** Manifest and asset submitted for this verification run. */
+  manifestId?: string;
+  assetId?: string;
+
   /** Stellar G-address of the user who submitted the job. */
   ownerPublicKey: string;
 
@@ -138,4 +142,11 @@ export interface ApiResponse<T = unknown> {
   error?: string;
   code?: string;
   message?: string;
+}
+
+/** Payload for POST /api/v1/verification/jobs/oracle/callback */
+export interface OracleCallbackDTO {
+  jobId: string; // MongoDB ObjectId of the VerificationJob
+  teeAttestationHash: string; // SHA-256 hex digest
+  teeSignature: string; // Oracle signature (hex/base64 string)
 }

@@ -6,6 +6,7 @@ import {
   Loader2,
   ChevronDown,
   Wallet,
+  UserCircle,
 } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 import { FREIGHTER_INSTALL_URL } from "@/services/wallet";
@@ -83,6 +84,15 @@ export function WalletModal() {
             transition={{ duration: 0.2 }}
             className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-darkblue/95 p-1 shadow-lg backdrop-blur-md z-50"
           >
+            <a
+              role="menuitem"
+              href="/launch"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90 transition hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset"
+              onClick={() => setIsOpen(false)}
+            >
+              <UserCircle className="h-4 w-4" aria-hidden="true" />
+              Access Account
+            </a>
             <button
               role="menuitem"
               onClick={() => {

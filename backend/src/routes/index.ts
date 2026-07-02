@@ -12,6 +12,8 @@ import authRoutes from "./auth.routes";
 import userRoutes from "./user.routes";
 import ipfsRoutes from "./ipfs.routes";
 import mediaRoutes from "./media.routes";
+import storageRoutes from "./v1/storage.routes";
+import verifyRoutes from "./v1/verification.routes";
 
 const router = Router();
 
@@ -36,5 +38,7 @@ router.use("/api/v1/auth", authRoutes);
 router.use("/api/v1/users", userRoutes);
 router.use("/api/v1/ipfs", ipfsRoutes);
 router.use("/api/v1/media", mediaRoutes);
+router.use("/api/v1/storage", storageRoutes);
+router.use("/api/v1/verify", verifyRoutes);
 
 export default router;

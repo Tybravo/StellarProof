@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import KMSKey, { IKMSKey } from '../models/KMSKey.model';
 import Asset from '../models/Asset.model';
+import { cloudinaryService } from './cloudinary.service';
+import { ipfsService } from './ipfs.service';
+import { v2 as cloudinary } from 'cloudinary';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96-bit nonce is standard for GCM buffers
@@ -154,6 +157,13 @@ export class KmsService {
       const newSymmetricKey = this.generateSymmetricKey();
       const encryptedNewKey = this.encryptKeyWithMaster(newSymmetricKey);
 
+      // Decrypt old symmetric key to access existing asset data
+      const oldSymmetricKey = this.decryptKeyWithMaster(
+        activeKey.encryptedKeyValue,
+        activeKey.iv,
+        activeKey.authTag
+      );
+
       // Find all assets encrypted with the old key
       const assetsToReEncrypt = await Asset.find({
         creatorId: userId,
@@ -161,8 +171,39 @@ export class KmsService {
         encryptionKeyVersion: oldKeyVersion
       }).session(session);
 
-      // Update asset metadata
+      // Re-encrypt actual asset data and update metadata
       for (const asset of assetsToReEncrypt) {
+        try {
+          // 1. Resolve URL and fetch the encrypted blob from storage
+          let downloadUrl = '';
+          if (asset.storageProvider === 'cloudinary') {
+            downloadUrl = cloudinary.url(asset.storageReferenceId, { resource_type: 'raw', secure: true });
+          } else if (asset.storageProvider === 'ipfs') {
+            downloadUrl = `${process.env.PINATA_GATEWAY_URL}/${asset.storageReferenceId}`;
+          } else {
+            throw new Error(`Storage provider ${asset.storageProvider} not supported for rotation`);
+          }
+
+          const response = await fetch(downloadUrl);
+          if (!response.ok) throw new Error(`Failed to fetch blob from ${asset.storageProvider}`);
+          const encryptedBlob = Buffer.from(await response.arrayBuffer());
+
+          // 2. Decrypt with old key, Re-encrypt with new key
+          const decryptedPayload = this.decryptBuffer(encryptedBlob, oldSymmetricKey);
+          const newEncryptedBlob = this.encryptBuffer(decryptedPayload, newSymmetricKey);
+
+          // 3. Upload the newly encrypted blob
+          if (asset.storageProvider === 'cloudinary') {
+            const uploadResult = await cloudinaryService.uploadBuffer(newEncryptedBlob, `stellarproof/spv-rotated/${userId}`);
+            asset.storageReferenceId = uploadResult.public_id;
+          } else if (asset.storageProvider === 'ipfs') {
+            const uploadResult = await ipfsService.upload({ content: newEncryptedBlob, name: asset.fileName });
+            asset.storageReferenceId = uploadResult.cid;
+          }
+        } catch (error) {
+          throw new Error(`Failed to re-encrypt asset ${asset._id}: ${(error as Error).message}`);
+        }
+
         asset.encryptionKeyVersion = newKeyVersion;
         await asset.save({ session });
       }

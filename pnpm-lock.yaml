@@ -162,6 +162,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.100.6
         version: 5.100.8(react@19.2.3)
+      '@testing-library/dom':
+        specifier: ^10.4.1
+        version: 10.4.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

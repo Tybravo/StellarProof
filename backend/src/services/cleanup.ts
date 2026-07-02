@@ -32,8 +32,16 @@ export class CleanupService {
    * These assets are "linked" and must NOT be deleted.
    */
   private async getLinkedAssetIds(): Promise<mongoose.Types.ObjectId[]> {
-    const jobs = await VerificationJobModel.distinct('assetId').exec();
-    return jobs as mongoose.Types.ObjectId[];
+    const jobs = await VerificationJobModel.distinct('assetId').exec() as unknown as Array<
+      string | mongoose.Types.ObjectId | null | undefined
+    >;
+    return jobs
+      .filter((id): id is string | mongoose.Types.ObjectId => Boolean(id))
+      .map((id) =>
+        id instanceof mongoose.Types.ObjectId
+          ? id
+          : new mongoose.Types.ObjectId(id),
+      );
   }
 
 
