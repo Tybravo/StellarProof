@@ -1,45 +1,73 @@
-/**
- * Manifest Controller – thin HTTP adapter layer.
- *
- * Each method:
- *  1. Extracts validated data from the request (query params are already
- *     validated by middleware before reaching here).
- *  2. Delegates to the service layer.
- *  3. Wraps the result in the standard ApiResponse envelope.
- *  4. Forwards any errors to the global error handler via `next(err)`.
- *
- * No business logic lives here.
- */
-import type { Request, Response, NextFunction } from "express";
-import { StatusCodes } from "http-status-codes";
-import { manifestService } from "../services/manifest.service";
-import type { ListManifestsQuery } from "../types/manifest.types";
+import { Request, Response, NextFunction } from 'express';
+import { StatusCodes } from 'http-status-codes';
+import { AppError } from '../errors/AppError';
+import { manifestService } from '../services/manifest.service';
+import type { ListManifestsQuery } from '../types/manifest.types';
 
-export class ManifestController {
+class ManifestController {
   /**
-   * GET /api/v1/manifests?ownerPublicKey=G...&limit=20&skip=0
-   * Returns a paginated list of manifests for the authenticated owner.
+   * GET /api/v1/manifests
    */
-  async listManifests(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  public async listManifests(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const query: ListManifestsQuery = {
-        ownerPublicKey: req.query.ownerPublicKey as string,
-        limit: Number(req.query.limit),
-        skip: Number(req.query.skip),
-      };
-
+      const query = req.query as unknown as ListManifestsQuery;
       const result = await manifestService.listManifests(query);
+      
+      res.status(StatusCodes.OK).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      res.status(StatusCodes.OK).json({
+  /**
+   * POST /api/v1/manifests
+   */
+  public async createManifest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const manifestPayload = req.body;
+      const user = req.user;
+
+      if (!user) {
+        throw new AppError('Authentication required', StatusCodes.UNAUTHORIZED, 'AUTH_REQUIRED');
+      }
+
+      if (!manifestPayload || typeof manifestPayload !== 'object') {
+        res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          error: 'Valid manifest data payload is required',
+        });
+        return;
+      }
+
+      // USE THE SANITIZATION PIPELINE HERE
+      const savedManifest = await manifestService.processManifest(manifestPayload);
+
+      res.status(StatusCodes.CREATED).json({
         success: true,
-        data: result,
+        message: 'Manifest created and hashed deterministically',
+        data: {
+          id: savedManifest._id,
+          manifestHash: savedManifest.manifestHash,
+          contentHash: savedManifest.contentHash,
+          createdAt: savedManifest.createdAt,
+        },
       });
-    } catch (err) {
-      next(err);
+    } catch (error: any) {
+      if (error.code === 11000) {
+        res.status(StatusCodes.CONFLICT).json({
+          success: false,
+          error: 'A manifest with this exact data and hash already exists',
+        });
+        return;
+      }
+      
+      // If our validation error throws, send a 400 Bad Request
+      if (error.message && error.message.includes('Validation Error')) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, error: error.message });
+        return;
+      }
+      
+      next(error);
     }
   }
 }

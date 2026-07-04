@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { cleanupService } from '../services/cleanup';
 import { CleanupResult } from '../types/cleanup';
-import { logger } from '../utils/logger';
+import logger from '../utils/logger';
 
 
 let isRunning = false;

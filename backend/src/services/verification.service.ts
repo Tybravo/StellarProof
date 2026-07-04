@@ -12,6 +12,7 @@ import type {
   IVerificationJob,
   CreateVerificationJobDTO,
   UpdateVerificationStatusDTO,
+  OracleCallbackDTO,
 } from "../types/verification.types";
 
 function assertValidObjectId(id: string): void {
@@ -130,9 +131,43 @@ async function updateJobStatus(
   return job.toObject<IVerificationJob>();
 }
 
+/**
+ * Handles the TEE oracle callback which provides attestation data.
+ * This stores the attestation fields and advances the job to `minting`.
+ */
+async function receiveOracleAttestation(
+  dto: OracleCallbackDTO
+): Promise<IVerificationJob> {
+  assertValidObjectId(dto.jobId);
+
+  const job = await VerificationJobModel.findById(dto.jobId);
+  if (!job) {
+    throw new AppError(
+      `Verification job not found: '${dto.jobId}'`,
+      StatusCodes.NOT_FOUND,
+      "JOB_NOT_FOUND"
+    );
+  }
+
+  const currentStatus = job.status as VerificationStatus;
+  const nextStatus = VerificationStatus.MINTING;
+
+  // Ensure the state machine permits this transition
+  assertValidTransition(currentStatus, nextStatus);
+
+  job.teeAttestationHash = dto.teeAttestationHash;
+  job.teeSignature = dto.teeSignature;
+  job.status = nextStatus;
+
+  await job.save();
+
+  return job.toObject<IVerificationJob>();
+}
+
 export const verificationService = {
   createJob,
   getJob,
   getJobsByOwner,
   updateJobStatus,
+  receiveOracleAttestation,
 } as const;

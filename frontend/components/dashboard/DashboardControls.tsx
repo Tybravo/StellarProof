@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Calendar, Search, X } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { SuspenseWrapper } from "../common/SuspenseWrapper";
 
 /* ------------------------------------------------------------------ */
 /*                              Types                                  */
@@ -24,9 +25,7 @@ export interface DashboardFilters {
 }
 
 export interface DashboardControlsProps {
-  /** Called whenever any filter changes */
   onChange?: (filters: DashboardFilters) => void;
-  /** Optional CSS class name */
   className?: string;
 }
 
@@ -162,10 +161,10 @@ function DateField({ id, label, value, max, min, onChange }: DateFieldProps) {
 }
 
 /* ------------------------------------------------------------------ */
-/*                         Main Component                              */
+/*                      Inner Component (uses searchParams)            */
 /* ------------------------------------------------------------------ */
 
-export default function DashboardControls({
+function DashboardControlsContent({
   onChange,
   className,
 }: DashboardControlsProps) {
@@ -177,7 +176,6 @@ export default function DashboardControls({
     paramsToFilters(searchParams)
   );
 
-  // Debounce URL push for search input
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pushUrl = useCallback(
@@ -203,7 +201,6 @@ export default function DashboardControls({
     [onChange, pushUrl]
   );
 
-  // Sync from external URL changes (e.g. back/forward navigation)
   useEffect(() => {
     const next = paramsToFilters(searchParams);
     setFilters(next);
@@ -365,5 +362,32 @@ function ActiveBadge({ label, onRemove }: { label: string; onRemove: () => void 
         <X className="w-3 h-3" />
       </button>
     </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*                        Main Export (with Suspense)                  */
+/* ------------------------------------------------------------------ */
+
+export default function DashboardControls(props: DashboardControlsProps) {
+  return (
+    <SuspenseWrapper
+      fallback={
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-4 animate-pulse">
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          </div>
+        </div>
+      }
+    >
+      <DashboardControlsContent {...props} />
+    </SuspenseWrapper>
   );
 }

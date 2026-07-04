@@ -37,3 +37,10 @@ export interface ManifestListResult {
   limit: number;
   skip: number;
 }
+
+export interface CreateManifestPayload {
+  contentHash: string;
+  creator?: string;
+  timestamp?: Date;
+  metadata?: Record<string, unknown>;
+}

@@ -22,16 +22,14 @@ const NAV_LINKS = [
   {
     label: "Instances",
     children: [
-      { href: "#assets", label: "Assets" },
+      { href: "/product", label: "Digital Product" },
       { href: "#use-cases", label: "Use Cases" },
     ],
   },
   { href: "#pricing", label: "Pricing" },
   {
     label: "Demo",
-    children: [
-      { href: "/dashboard", label: "Verification Dashboard" },
-    ],
+    children: [{ href: "/dashboard", label: "Verification Dashboard" }],
   },
 ] as const;
 
@@ -98,8 +96,12 @@ export default function Header() {
 
   useEffect(() => {
     const sectionIds = [
-      "#home", "#about", "#creator", "#developer",
-      "#assets", "#use-cases", "#pricing",
+      "#home",
+      "#about",
+      "#creator",
+      "#developer",
+      "#use-cases",
+      "#pricing",
     ];
     const observer = new IntersectionObserver(
       (entries) => {
@@ -111,7 +113,7 @@ export default function Header() {
           }
         }
       },
-      { rootMargin: "-20% 0px -60% 0px", threshold: 0 }
+      { rootMargin: "-20% 0px -60% 0px", threshold: 0 },
     );
     sectionIds.forEach((id) => {
       const el = document.querySelector(id);
@@ -121,45 +123,58 @@ export default function Header() {
   }, []);
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full border-b border-gray-200 dark:border-white/20 transition-all duration-300 ${
+    <>
+      <header
+        className={`fixed top-0 left-0 z-50 w-full border-b border-gray-200 dark:border-white/20 transition-all duration-300 ${
         // Glassmorphism effect when scrolled
         isScrolled
           ? "bg-white/80 dark:bg-darkblue/80 backdrop-blur-md shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]"
           : "bg-white dark:bg-darkblue shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.2)]"
       }`}
     >
-      
+
       <WrongNetworkWarning />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-
         {/* Logo */}
         <a
           href="#home"
           aria-label="StellarProof — go to home"
-          onClick={(e) => { e.preventDefault(); scrollToSection("#home"); }}
+          onClick={(e) => {
+            e.preventDefault();
+            scrollToSection("#home");
+          }}
           className="flex shrink-0 items-center gap-2.5 outline-none transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue"
         >
           <LogoIcon />
-          <span className="text-xl font-semibold tracking-tight" aria-hidden="true">
+          <span
+            className="text-xl font-semibold tracking-tight"
+            aria-hidden="true"
+          >
             <span className="text-primary">Stellar</span>
             <span className="text-secondary">Proof</span>
           </span>
         </a>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
+        <nav
+          className="hidden items-center gap-1 lg:flex"
+          aria-label="Main navigation"
+        >
           <ul className="flex items-center gap-1">
             {NAV_LINKS.map((item) =>
               "href" in item ? (
                 <li key={item.href}>
                   <a
                     href={item.href}
-                    onClick={(e) => { e.preventDefault(); scrollToSection(item.href); }}
-                    className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue ${activeSection === item.href
+                    onClick={(e) => {
+                      e.preventDefault();
+                      scrollToSection(item.href);
+                    }}
+                    className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-darkblue ${
+                      activeSection === item.href
                         ? "text-gray-900 dark:text-white"
                         : "text-gray-600 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
-                      }`}
+                    }`}
                   >
                     {item.label}
                     {activeSection === item.href && (
@@ -229,7 +244,7 @@ export default function Header() {
                     )}
                   </AnimatePresence>
                 </li>
-              )
+              ),
             )}
           </ul>
         </nav>
@@ -248,7 +263,11 @@ export default function Header() {
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             onClick={() => setMobileOpen((o) => !o)}
           >
-            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {mobileOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
           </button>
         </div>
       </div>
@@ -273,7 +292,10 @@ export default function Header() {
                     <li key={item.href}>
                       <a
                         href={item.href}
-                        onClick={(e) => { e.preventDefault(); handleNavClick(item.href); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleNavClick(item.href);
+                        }}
                         className="block rounded-lg px-4 py-3 text-base font-medium text-gray-800 dark:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 touch-manipulation transition-colors duration-300"
                       >
                         {item.label}
@@ -287,7 +309,9 @@ export default function Header() {
                         aria-expanded={mobileDropdown === item.label}
                         aria-controls={`mobile-dropdown-${item.label.toLowerCase()}`}
                         onClick={() =>
-                          setMobileDropdown((d) => d === item.label ? null : item.label)
+                          setMobileDropdown((d) =>
+                            d === item.label ? null : item.label,
+                          )
                         }
                       >
                         {item.label}
@@ -328,7 +352,7 @@ export default function Header() {
                         )}
                       </AnimatePresence>
                     </li>
-                  )
+                  ),
                 )}
               </ul>
               <div className="mt-4 border-t border-gray-200 dark:border-white/10 pt-4 px-4 w-full">
@@ -338,6 +362,9 @@ export default function Header() {
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+      </header>
+      {/* Spacer to prevent page content from being hidden under the fixed header */}
+      <div aria-hidden className="h-16 w-full" />
+    </>
   );
 }

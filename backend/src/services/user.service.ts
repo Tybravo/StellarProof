@@ -33,6 +33,7 @@ export class UserService {
       );
     }
 
+
     const updated = await User.findByIdAndUpdate(
       userId,
       { stellarPublicKey },
@@ -45,6 +46,46 @@ export class UserService {
 
     return updated;
   }
+
+
+
+  async getProfile(userId: string): Promise<IUser> {
+  const user = await User.findById(userId).exec();
+  if (!user) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+  return user;
+}
+
+async updateProfile(userId: string, updates: Partial<IUser>): Promise<IUser> {
+  // Restricted fields that cannot be updated via this route
+  const RESTRICTED_FIELDS = [
+    'role',
+    'passwordHash',
+    'apiKeys',
+    'isActive',
+    'resetPasswordToken',
+    'resetPasswordExpires',
+    'nonce',
+  ];
+
+  // Strip restricted fields silently
+  RESTRICTED_FIELDS.forEach(field => delete (updates as Record<string, unknown>)[field]);
+
+  if (Object.keys(updates).length === 0) {
+    throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
+  }
+
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    { $set: updates },
+    { new: true, runValidators: true }
+  ).exec();
+
+  if (!updated) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+  return updated;
+}
+
+
 }
 
 export const userService = new UserService();
+

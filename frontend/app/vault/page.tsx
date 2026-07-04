@@ -5,8 +5,6 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Download,
-  Eye,
   FileKey2,
   Lock,
   Search,
@@ -17,6 +15,9 @@ import {
 import Header from "../../components/Header";
 import { useWallet } from "@/context/WalletContext";
 import { cn } from "../../utils/cn";
+
+import { VaultActions } from "../../components/vault/VaultActions";
+import { DecryptionPreview } from "../../components/vault/DecryptionPreview";
 
 /* ------------------------------------------------------------------ */
 /*                          Mock service layer                         */
@@ -144,7 +145,8 @@ const MOCK_VAULT_ITEMS: VaultItem[] = [
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
@@ -193,11 +195,13 @@ function StatusBadge({ status }: { status: VaultItemStatus }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border",
-        cfg.className
+        cfg.className,
       )}
     >
       {status === "encrypted" && <Lock className="w-2.5 h-2.5" aria-hidden />}
-      {status === "minted" && <ShieldCheck className="w-2.5 h-2.5" aria-hidden />}
+      {status === "minted" && (
+        <ShieldCheck className="w-2.5 h-2.5" aria-hidden />
+      )}
       {cfg.label}
     </span>
   );
@@ -288,16 +292,8 @@ function VaultRow({ item }: RowProps) {
       {/* Actions */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5">
-          <ActionButton
-            icon={<Download className="w-3.5 h-3.5" />}
-            label="Download Encrypted"
-            onClick={() => {}}
-          />
-          <ActionButton
-            icon={<Eye className="w-3.5 h-3.5" />}
-            label="Decrypt Preview"
-            onClick={() => {}}
-          />
+          <VaultActions item={item} />
+          <DecryptionPreview item={item} />
           {item.status === "minted" && item.certificateUrl && (
             <ActionButton
               icon={<ShieldCheck className="w-3.5 h-3.5" />}
@@ -330,7 +326,7 @@ function ActionButton({ icon, label, onClick, accent }: ActionButtonProps) {
         "p-1.5 rounded-lg transition-colors",
         accent
           ? "text-primary hover:bg-primary/10"
-          : "text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10"
+          : "text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10",
       )}
     >
       {icon}
@@ -355,7 +351,11 @@ function Pagination({ page, totalPages, onPage }: PaginationProps) {
   } else {
     pages.push(1);
     if (page > 3) pages.push("…");
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+    for (
+      let i = Math.max(2, page - 1);
+      i <= Math.min(totalPages - 1, page + 1);
+      i++
+    ) {
       pages.push(i);
     }
     if (page < totalPages - 2) pages.push("…");
@@ -389,12 +389,12 @@ function Pagination({ page, totalPages, onPage }: PaginationProps) {
               "w-8 h-8 rounded-lg text-xs font-medium transition-colors",
               p === page
                 ? "bg-primary text-white shadow-button-glow"
-                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10",
             )}
           >
             {p}
           </button>
-        )
+        ),
       )}
 
       <button
@@ -425,7 +425,11 @@ export default function VaultPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return MOCK_VAULT_ITEMS.filter((item) => {
-      if (q && !item.storageId.toLowerCase().includes(q) && !item.filename.toLowerCase().includes(q)) {
+      if (
+        q &&
+        !item.storageId.toLowerCase().includes(q) &&
+        !item.filename.toLowerCase().includes(q)
+      ) {
         return false;
       }
       if (dateFrom && item.date < dateFrom) return false;
@@ -436,7 +440,10 @@ export default function VaultPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageItems = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
 
   function handlePageChange(p: number) {
     setPage(Math.max(1, Math.min(p, totalPages)));
@@ -462,8 +469,10 @@ export default function VaultPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-darkblue-dark">
       <Header />
 
-      <main id="main-content" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-
+      <main
+        id="main-content"
+        className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10"
+      >
         {/* Page header */}
         <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -494,10 +503,8 @@ export default function VaultPage() {
           </div>
         ) : (
           <div className="space-y-4">
-
             {/* Controls */}
             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-4">
-
               {/* Search */}
               <div className="relative">
                 <Search
@@ -516,7 +523,7 @@ export default function VaultPage() {
                     "text-gray-800 dark:text-gray-100",
                     "placeholder-gray-400 dark:placeholder-gray-500",
                     "border-gray-300 dark:border-gray-600",
-                    "focus:outline-none focus:ring-2 focus:ring-primary/60 transition-colors"
+                    "focus:outline-none focus:ring-2 focus:ring-primary/60 transition-colors",
                   )}
                 />
                 {query && (
@@ -535,28 +542,48 @@ export default function VaultPage() {
               <div className="grid grid-cols-2 gap-3">
                 {(
                   [
-                    { id: "vault-from", label: "From", value: dateFrom, setter: setDateFrom, max: dateTo || undefined },
-                    { id: "vault-to", label: "To", value: dateTo, setter: setDateTo, min: dateFrom || undefined },
+                    {
+                      id: "vault-from",
+                      label: "From",
+                      value: dateFrom,
+                      setter: setDateFrom,
+                      max: dateTo || undefined,
+                    },
+                    {
+                      id: "vault-to",
+                      label: "To",
+                      value: dateTo,
+                      setter: setDateTo,
+                      min: dateFrom || undefined,
+                    },
                   ] as const
                 ).map(({ id, label, value, setter, ...rest }) => (
                   <div key={id} className="flex flex-col gap-1">
-                    <label htmlFor={id} className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <label
+                      htmlFor={id}
+                      className="text-xs font-medium text-gray-500 dark:text-gray-400"
+                    >
                       {label}
                     </label>
                     <div className="relative">
-                      <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" aria-hidden />
+                      <Calendar
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+                        aria-hidden
+                      />
                       <input
                         id={id}
                         type="date"
                         value={value}
-                        onChange={(e) => handleFilterChange(setter)(e.target.value)}
+                        onChange={(e) =>
+                          handleFilterChange(setter)(e.target.value)
+                        }
                         {...rest}
                         className={cn(
                           "pl-8 pr-3 py-2 text-xs rounded-lg border w-full",
                           "bg-white dark:bg-darkblue-dark",
                           "text-gray-800 dark:text-gray-100",
                           "border-gray-300 dark:border-gray-600",
-                          "focus:outline-none focus:ring-2 focus:ring-primary/60 transition-colors"
+                          "focus:outline-none focus:ring-2 focus:ring-primary/60 transition-colors",
                         )}
                       />
                     </div>
@@ -568,7 +595,8 @@ export default function VaultPage() {
               {hasFilters && (
                 <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {filtered.length} result{filtered.length !== 1 ? "s" : ""} found
+                    {filtered.length} result{filtered.length !== 1 ? "s" : ""}{" "}
+                    found
                   </p>
                   <button
                     type="button"
@@ -588,7 +616,10 @@ export default function VaultPage() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left" aria-label="Vault items">
+                    <table
+                      className="w-full text-left"
+                      aria-label="Vault items"
+                    >
                       <thead>
                         <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-white/[0.02]">
                           {[

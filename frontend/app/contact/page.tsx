@@ -424,14 +424,13 @@ export default function ContactPage() {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {previewUrl ? (
-                          <div className="relative w-10 h-10 flex-shrink-0 border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
-                            <Image
-                              src={previewUrl}
-                              alt="Preview"
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
+                          <Image
+                            src={previewUrl}
+                            alt="Preview"
+                            width={40}
+                            height={40}
+                            className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-200 dark:border-gray-600"
+                          />
                         ) : (
                           <Paperclip
                             size={16}

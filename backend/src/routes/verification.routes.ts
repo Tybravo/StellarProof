@@ -104,6 +104,14 @@ const updateStatusSchema = z
     }
   });
 
+const oracleCallbackSchema = z.object({
+  jobId: z.string().regex(MONGO_OBJECT_ID_REGEX, "jobId must be a valid MongoDB ObjectId"),
+  teeAttestationHash: z
+    .string()
+    .regex(SHA256_HEX_REGEX, "teeAttestationHash must be a valid SHA-256 hex digest"),
+  teeSignature: z.string().min(1, "teeSignature is required"),
+});
+
 function validateOwnerQuery(req: Request, res: Response, next: NextFunction): void {
   const result = ownerPublicKeyQuerySchema.safeParse(req.query);
   if (!result.success) {
@@ -142,6 +150,12 @@ router.patch(
   validateParams(jobIdParamsSchema),
   validateBody(updateStatusSchema),
   verificationController.updateStatus.bind(verificationController)
+);
+
+router.post(
+  "/oracle/callback",
+  validateBody(oracleCallbackSchema),
+  verificationController.oracleCallback.bind(verificationController)
 );
 
 export default router;

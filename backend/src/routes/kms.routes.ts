@@ -1,19 +1,19 @@
 import { Router } from 'express';
-import { rotateKey, getUserKeys, getActiveKey, revokeKey } from '../controllers/kms.controller';
+import { rotateKey, getAllKeys, getActiveKey, revokeKey } from '../controllers/kms.controller';
 
 const router = Router();
 
 /**
- * POST /api/v1/kms/rotate
+ * POST /api/v1/kms/rotate/:userId
  * Rotate KMS key for a user
  */
-router.post('/rotate', rotateKey);
+router.post('/rotate/:userId', rotateKey);
 
 /**
  * GET /api/v1/kms/keys/:userId
  * Get all KMS keys for a user
  */
-router.get('/keys/:userId', getUserKeys);
+router.get('/keys/:userId', getAllKeys);
 
 /**
  * GET /api/v1/kms/keys/:userId/active
@@ -22,10 +22,9 @@ router.get('/keys/:userId', getUserKeys);
 router.get('/keys/:userId/active', getActiveKey);
 
 /**
- * DELETE /api/v1/kms/keys/:id
+ * DELETE /api/v1/kms/keys/:keyId
  * Revoke a KMS key (set isActive to false)
  */
-router.delete('/keys/:id', revokeKey);
+router.delete('/keys/:keyId', revokeKey);
 
 export default router;
-

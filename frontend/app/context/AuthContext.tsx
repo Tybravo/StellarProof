@@ -48,6 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   });
 
+  const setAuthState = (state: { isAuthenticated: boolean; user: User | null }) => {
+    setIsAuthenticated(state.isAuthenticated);
+    setUser(state.user);
+  };
+
   const login = async (email: string, password: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -57,8 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -76,8 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAuthenticated: true,
             user: { name, email },
           };
-          setIsAuthenticated(authState.isAuthenticated);
-          setUser(authState.user);
+          setAuthState(authState);
           localStorage.setItem("stellarproof_auth", JSON.stringify(authState));
           resolve();
         } else {
@@ -88,8 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
+    setAuthState({ isAuthenticated: false, user: null });
     localStorage.removeItem("stellarproof_auth");
   };
 

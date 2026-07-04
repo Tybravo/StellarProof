@@ -1,18 +1,20 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { useWizardStore } from '../store/wizard.store';
 import WizardStepper from './WizardStepper';
 import WizardNavigation from './WizardNavigation';
-import ModeSelection from './steps/ModeSelection';
-import StepIdentity from './steps/StepIdentity';
-import StepDocuments from './steps/StepDocuments';
-import StepReview from './steps/StepReview';
+import UploadMedia from './steps/UploadMedia';
+import UploadManifest from './steps/UploadManifest';
+import UploadSPVOptions from './steps/UploadSPVOptions';
+import UploadReview from './steps/UploadReview';
+import { submitVerificationRequest } from '@/services/verificationService';
 
 const STEPS = [
-  { id: 0, label: 'Mode Selection' },
-  { id: 1, label: 'Identity' },
-  { id: 2, label: 'Documents' },
-  { id: 3, label: 'Review' },
+  { id: 0, label: 'Media Upload' },
+  { id: 1, label: 'Manifest Attachment' },
+  { id: 2, label: 'SPV Privacy' },
+  { id: 3, label: 'Review & Submit' },
 ];
 
 export default function WizardPageShell() {
@@ -20,60 +22,78 @@ export default function WizardPageShell() {
     currentStep,
     setStep,
     validation,
+    formData,
     resetWizard,
   } = useWizardStore();
 
-  // Hydration guard
- const hasHydrated = useWizardStore((state) => state._hasHydrated);
-
-if (!hasHydrated) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
-    </div>
-  );
-}
+  const hasHydrated = useWizardStore((state) => state._hasHydrated);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isLastStep = currentStep === STEPS.length - 1;
   const isFirstStep = currentStep === 0;
   const isCurrentStepValid = validation[currentStep] ?? false;
 
-  const handleNext = () => {
-    if (!isCurrentStepValid) return;
-    if (!isLastStep) setStep(currentStep + 1);
-  };
+  const handleNext = useCallback(() => {
+    const step = currentStep;
+    if (!validation[step]) return;
+    if (step < STEPS.length - 1) setStep(step + 1);
+  }, [currentStep, validation, setStep]);
 
-  const handleBack = () => {
-    if (!isFirstStep) setStep(currentStep - 1);
-  };
+  const handleBack = useCallback(() => {
+    const step = currentStep;
+    if (step > 0) setStep(step - 1);
+  }, [currentStep, setStep]);
 
-  const handleSubmit = async () => {
-    if (!isCurrentStepValid) return;
+  const handleNavigate = useCallback(
+    (step: number) => {
+      setStep(step);
+    },
+    [setStep],
+  );
 
+  const handleSubmit = useCallback(async () => {
+    setIsSubmitting(true);
     try {
-      console.log('Submitting wizard data...');
-      await new Promise((res) => setTimeout(res, 800));
-
+      const content = formData.content;
+      await submitVerificationRequest(
+        content?.contentHash ?? '',
+        content?.manifestHash ?? null,
+        'GAAAAAAAAAAAAAAA',
+      );
       resetWizard();
     } catch (error) {
       console.error('Submission failed:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [formData.content, resetWizard]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     resetWizard();
-  };
+  }, [resetWizard]);
 
   const stepComponents = [
-    <ModeSelection key="mode" />,
-    <StepIdentity key="identity" />,
-    <StepDocuments key="documents" />,
-    <StepReview key="review" />,
+    <UploadMedia key="media" />,
+    <UploadManifest key="manifest" />,
+    <UploadSPVOptions key="spv" />,
+    <UploadReview
+      key="review"
+      onNavigate={handleNavigate}
+      onSubmit={handleSubmit}
+      isSubmitting={isSubmitting}
+    />,
   ];
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617]">
-      {/* Screen reader live region announces step changes */}
       <div
         role="status"
         aria-live="polite"
@@ -102,14 +122,28 @@ if (!hasHydrated) {
             {stepComponents[currentStep]}
           </div>
 
-          <WizardNavigation
-            isFirstStep={isFirstStep}
-            isLastStep={isLastStep}
-            isValid={isCurrentStepValid}
-            onBack={handleBack}
-            onNext={handleNext}
-            onSubmit={handleSubmit}
-          />
+          {!isLastStep ? (
+            <WizardNavigation
+              isFirstStep={isFirstStep}
+              isLastStep={false}
+              isValid={isCurrentStepValid}
+              onBack={handleBack}
+              onNext={handleNext}
+              onSubmit={handleSubmit}
+            />
+          ) : (
+            <div className="mt-12 flex justify-between border-t border-gray-200 dark:border-gray-800 pt-8">
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={isFirstStep}
+                aria-label="Go to previous step"
+                className="px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                Back
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 text-center">

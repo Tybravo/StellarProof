@@ -7,7 +7,7 @@ The Verification Pipeline is the core logic of the StellarProof system, now inte
 When an off-chain oracle provider processes a verification request, it submits an `Attestation` and a cryptographic `Signature` to the `process_verification` function. The pipeline executes the following steps in strict order to ensure deterministic and atomic transitions:
 
 1. **Request Retrieval**: The contract lookups the `VerificationRequest` using the provided `request_id`.
-2. **State Guard**: Ensures the request is in the `Pending` state. If it is already `Verified` or `Rejected`, the transaction fails with `AlreadyProcessed`.
+<!-- 2. **State Guard**: Ensures the request is in the `Pending` state. If it is already `Verified` or `Rejected`, the transaction fails with `AlreadyProcessed`. -->
 3. **Signature Validation**: The `Signature` is verified against the `Attestation` payload using the provider's public key (found in the attestation).
 4. **Registry Check**:
    - **Provider Authorization**: Validates that the signing provider is currently authorized in the `Provider` registry.
