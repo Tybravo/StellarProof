@@ -134,7 +134,7 @@ export default function LoginForm() {
           Remember me
         </label>
         <a
-          href="/forgot-password"
+          href="/forget-password"
           className="text-sm text-primary hover:underline"
         >
           Forgot your password?

@@ -126,6 +126,38 @@ export class AuthService {
     // Token is generated — email delivery is handled by the caller or a mailer service
     // rawToken would be sent via email in a production setup
   }
+
+  
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    if (!token || !newPassword) {
+      throw new AppError('Token and new password are required', 400, 'MISSING_DATA');
+    }
+
+    // 1. Hash the incoming raw token to compare with the DB hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // 2. Find the user by token and ensure it hasn't expired
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).exec();
+
+    if (!user) {
+      throw new AppError('Invalid or expired password reset token', 400, 'INVALID_TOKEN');
+    }
+
+    // 3. Update the password
+    // We pass the raw password to passwordHash to trigger your Mongoose pre-save hook
+    user.passwordHash = newPassword;
+
+    // 4. Clear the temporary reset fields
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    // 5. Save the changes
+    await user.save();
+  }
 }
 
 export const authService = new AuthService();

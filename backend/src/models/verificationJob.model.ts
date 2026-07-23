@@ -20,6 +20,18 @@ const ALL_STATUSES = Object.values(VerificationStatus);
 
 const VerificationJobSchema = new Schema<VerificationJobDocument>(
   {
+    manifestId: {
+      type: Schema.Types.ObjectId,
+      ref: "Manifest",
+      index: true,
+      default: undefined,
+    },
+    assetId: {
+      type: Schema.Types.ObjectId,
+      ref: "Asset",
+      index: true,
+      default: undefined,
+    },
     ownerPublicKey: {
       type: String,
       required: [true, "ownerPublicKey is required"],

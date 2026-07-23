@@ -1,58 +1,102 @@
-"use client";
+'use client';
 
-import React, { useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
-import UseCases, { TEMPLATES, Template } from "../UseCases";
-import ManifestModal from "./ManifestModal";
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { SuspenseWrapper } from '../common/SuspenseWrapper';
 
-export default function ManifestModalTrigger() {
+interface ManifestModalTriggerProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+function ManifestModalTriggerContent({ className, children }: ManifestModalTriggerProps) {
   const searchParams = useSearchParams();
-  
-  const initialTemplateId = searchParams.get("template");
-  const initialTemplate = initialTemplateId ? (TEMPLATES.find((t) => t.id === initialTemplateId) ?? null) : null;
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
 
-  const [isOpen, setIsOpen] = useState(!!initialTemplate);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(initialTemplate);
-  
-  // Store manifest data for each template to preserve state
-  const [manifestStates, setManifestStates] = useState<Record<string, Record<string, string>>>({});
+  const manifestId = searchParams.get('manifestId');
+  const isModalOpen = searchParams.get('modal') === 'manifest';
 
-  const handleUpdate = useCallback((templateId: string, data: Record<string, string>) => {
-    setManifestStates((prev: Record<string, Record<string, string>>) => ({ ...prev, [templateId]: data }));
-  }, []);
+  useEffect(() => {
+    setIsOpen(isModalOpen);
+  }, [isModalOpen]);
 
-  // Handle template selection and modal opening
-  const handleSelect = useCallback((template: Template) => {
-    setSelectedTemplate(template);
+  const openModal = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('modal', 'manifest');
+    router.push(`${pathname}?${params.toString()}`);
     setIsOpen(true);
-    
-    // Update URL without reloading to support deep-linking/sharing
-    const params = new URLSearchParams(window.location.search);
-    params.set("template", template.id);
-    window.history.pushState(null, "", `?${params.toString()}`);
-  }, []);
+  };
 
-  const handleClose = useCallback(() => {
+  const closeModal = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('modal');
+    router.push(`${pathname}?${params.toString()}`);
     setIsOpen(false);
-    
-    // Clear URL parameter when modal closes
-    const params = new URLSearchParams(window.location.search);
-    params.delete("template");
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
-    window.history.pushState(null, "", newUrl);
-  }, []);
+  };
 
   return (
     <>
-      <UseCases onSelect={handleSelect} />
-      <ManifestModal 
-        open={isOpen} 
-        onClose={handleClose} 
-        template={selectedTemplate}
-        data={selectedTemplate ? (manifestStates[selectedTemplate.id] || selectedTemplate.defaultData) : {}}
-        onUpdate={(newData) => selectedTemplate && handleUpdate(selectedTemplate.id, newData)}
-      />
+      <button
+        onClick={openModal}
+        className={className || "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"}
+      >
+        {children || 'Open Manifest'}
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                Manifest Details
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Manifest ID
+                </p>
+                <p className="text-gray-900 dark:text-white font-mono break-all">
+                  {manifestId || 'No manifest selected'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={closeModal}
+                className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
+export function ManifestModalTrigger(props: ManifestModalTriggerProps) {
+  return (
+    <SuspenseWrapper
+      fallback={
+        <div className="animate-pulse px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md h-10 w-32" />
+      }
+    >
+      <ManifestModalTriggerContent {...props} />
+    </SuspenseWrapper>
+  );
+}
+
+export default ManifestModalTrigger;

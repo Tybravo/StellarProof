@@ -36,10 +36,10 @@
   - Smart Contracts (Oracle, Provenance, Registry) implemented in Rust.
   - Frontend Verification Wizard using Zustand.
 - **Partially Completed Systems**:
-  - Oracle Worker / TEE integration (currently mocked/simulated in frontend).
-  - Actual asset data re-encryption in KMS (currently only metadata/mocked).
+  - Actual asset data re-encryption in KMS (partially completed: service logic exists, integration pending).
 - **Missing Systems**: 
   - Complete AWS Nitro Enclave production deployment.
+  - Oracle Worker / TEE integration (not yet implemented).
   - Real-time webhook notifications for verification completion.
 
 ## Folder Structure Analysis
@@ -100,8 +100,8 @@
 - **Testing Style**: Jest for unit and integration testing. `*.test.ts` alongside implementation or in `__tests__/` folders.
 
 ## Known Issues
-- Actual asset data re-encryption in KMS is pending (currently metadata only).
-- TEE Verification in frontend is currently mocked/simulated with timeouts and hardcoded data.
+- Actual asset data re-encryption in KMS is pending (partially completed: service logic exists, integration pending).
+- TEE Verification in frontend is currently mocked/simulated with timeouts and hardcoded data. (Note: The Oracle Worker itself is not implemented yet).
 - Handling of `useSearchParams` needs strict `<Suspense>` wrapping (Next.js build issue noted in user memories).
 
 ## Technical Debt
@@ -127,6 +127,6 @@
 
 ## Recommended Next Steps
 1. Replace mock Soroban submissions in frontend with actual `@stellar/stellar-sdk` transactions.
-2. Implement actual file data re-encryption in `kms.service.ts`.
+2. Finalize actual file data re-encryption integration in `kms.service.ts` (service logic exists).
 3. Complete the Oracle Worker orchestration logic for AWS Nitro Enclaves.
 4. Add comprehensive E2E tests for the full verification pipeline.

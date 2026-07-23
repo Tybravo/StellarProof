@@ -1,0 +1,10 @@
+Figma Design Footer
+
+- Footer Mobile Component
+- Footer Layout
+- Certificate Page
+- Launch App Page
+
+
+https://www.figma.com/design/2kP82C0Z8z0X3CncLQmfhB/Stellar-Project-Fig?node-id=227-2&p=f&t=u5kc1OpzF6FQwqtT-0
+

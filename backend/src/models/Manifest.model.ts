@@ -20,6 +20,9 @@ export interface IManifest extends Document {
     [key: string]: any;          // Allow arbitrary additional metadata
   };
   manifestHash?: string;         // The hash of this entire manifest document
+  ipfsCid?: string;
+  ipfsUrl?: string;
+  ipfsUploadedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +59,16 @@ const ManifestSchema: Schema = new Schema(
       type: String,
       unique: true,
       sparse: true,
+    },
+    ipfsCid: {
+      type: String,
+      index: true,
+    },
+    ipfsUrl: {
+      type: String,
+    },
+    ipfsUploadedAt: {
+      type: Date,
     }
   },
   { 

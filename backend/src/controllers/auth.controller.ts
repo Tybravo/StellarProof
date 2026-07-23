@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { AppError } from '../errors/AppError';
 
+
 /**
  * POST /api/v1/auth/login
  */
@@ -102,6 +103,28 @@ export const forgotPassword = async (
     res.status(200).json({
       success: true,
       message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const resetPasswordController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // Add this quick validation check to match your other controllers
+    if (!password || typeof password !== 'string') {
+      return next(new AppError('A valid new password is required', 400, 'INVALID_INPUT'));
+    }
+
+    await authService.resetPassword(token, password);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully',
     });
   } catch (error) {
     next(error);

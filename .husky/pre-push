@@ -1,2 +1,6 @@
-pnpm build:frontend
-pnpm build:contracts
+pnpm --filter web build
+if command -v stellar >/dev/null 2>&1; then
+	pnpm build:contracts
+else
+	echo "stellar CLI not found; skipping contracts build"
+fi

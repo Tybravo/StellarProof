@@ -10,7 +10,7 @@
 - [x] KMS basic encryption and key rotation.
 - [x] Frontend Verification Wizard UI and state management.
 - [ ] Replace frontend mocks with actual `@stellar/stellar-sdk` contract calls.
-- [ ] Complete KMS asset data re-encryption during key rotation.
+- [ ] Complete KMS asset data re-encryption during key rotation (partially completed: service logic exists, integration pending).
 
 ## Completed Milestones
 **Phase 0 — Architecture Design**

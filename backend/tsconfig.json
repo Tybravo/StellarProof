@@ -10,9 +10,15 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    
+    // 1. Add the types right here inside compilerOptions!
+    "types": ["jest", "node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  
+  // 2. Include the tests folder (assuming your tests are outside src)
+  "include": ["src/**/*", "tests/**/*"],
+  
+  // 3. Remove "**/*.test.ts" so TypeScript stops ignoring your test files!
+  "exclude": ["node_modules"]
 }
-

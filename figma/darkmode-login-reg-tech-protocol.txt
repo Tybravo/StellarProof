@@ -1,0 +1,10 @@
+Figma Dark Mode Design for:
+
+- Login page
+- Register page 
+- Core Technology 
+- Protocol Workflow
+
+Link to Figma:
+https://www.figma.com/design/2kP82C0Z8z0X3CncLQmfhB/Stellar-Project-Fig?node-id=227-2&p=f&t=u5kc1OpzF6FQwqtT-0
+
