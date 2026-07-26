@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Package, ShieldCheck, ListFilter, User, LogIn, Wallet } from "lucide-react";
+import { Package, ShieldCheck, ListFilter, User, LogIn } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 import { useAuth } from "@/app/context/AuthContext";
 import {
