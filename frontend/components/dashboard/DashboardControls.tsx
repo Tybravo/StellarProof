@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useEffect  } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Calendar, Search, X } from "lucide-react";
 import { cn } from "../../utils/cn";
@@ -201,12 +201,19 @@ function DashboardControlsContent({
     [onChange, pushUrl]
   );
 
+  // Sync filters from URL search params (e.g. browser back/forward)
+  // Uses render-time state adjustment to avoid setState in effects
+  const searchParamsKey = searchParams.toString();
+  const [prevSearchParamsKey, setPrevSearchParamsKey] = useState(searchParamsKey);
+  if (searchParamsKey !== prevSearchParamsKey) {
+    setPrevSearchParamsKey(searchParamsKey);
+    setFilters(paramsToFilters(searchParams));
+  }
+
+  // Notify parent when search params change
   useEffect(() => {
-    const next = paramsToFilters(searchParams);
-    setFilters(next);
-    onChange?.(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+    onChange?.(paramsToFilters(searchParams));
+  }, [searchParams, onChange]);
 
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     applyFilters({ ...filters, query: e.target.value }, true);

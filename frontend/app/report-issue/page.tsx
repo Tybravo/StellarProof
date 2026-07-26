@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/app/context/ThemeContext";
 import { useWallet } from "@/context/WalletContext";
 import { useToast } from "@/app/context/ToastContext";
@@ -66,36 +66,24 @@ export default function ReportIssuePage() {
     attachment: null,
   });
   const [errors, setErrors] = useState<ReportIssueFormErrors>({});
-  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const attachmentPreview = useMemo(() => {
+    if (!formState.attachment) return null;
+    return URL.createObjectURL(formState.attachment);
+  }, [formState.attachment]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
   const isOtherCategorySelected = formState.category === "other";
-  const hasWallet = Boolean(formState.wallet);
+  const displayWallet = publicKey || "";
+  const displayNetwork = detectNetwork();
+  const hasWallet = Boolean(publicKey);
 
-  // Initialize wallet and network
+  // Cleanup blob URLs on unmount or when preview changes
   useEffect(() => {
-    setFormState((prev) => ({
-      ...prev,
-      wallet: publicKey || "",
-      network: detectNetwork(),
-    }));
-  }, [publicKey]);
-
-  // Generate/revoke attachment preview URL
-  useEffect(() => {
-    if (!formState.attachment) {
-      setAttachmentPreview(null);
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(formState.attachment);
-    setAttachmentPreview(previewUrl);
-
     return () => {
-      URL.revokeObjectURL(previewUrl);
+      if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
     };
-  }, [formState.attachment]);
+  }, [attachmentPreview]);
 
   const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextCategory = event.target.value;
@@ -237,8 +225,8 @@ export default function ReportIssuePage() {
         category: "",
         otherCategory: "",
         description: "",
-        wallet: publicKey || "",
-        network: detectNetwork(),
+        wallet: "",
+        network: "",
         attachment: null,
       });
     } catch (error) {
@@ -473,7 +461,7 @@ export default function ReportIssuePage() {
               <input
                 id="wallet"
                 type="text"
-                value={formState.wallet}
+                value={displayWallet}
                 readOnly
                 className={`${inputBase} ${inputReadOnly}`}
               />
@@ -483,7 +471,7 @@ export default function ReportIssuePage() {
                 }`}
               >
                 {hasWallet
-                  ? `Connected wallet: ${formState.wallet.slice(0, 6)}...${formState.wallet.slice(-6)}`
+                  ? `Connected wallet: ${displayWallet.slice(0, 6)}...${displayWallet.slice(-6)}`
                   : "No wallet connected"}
               </p>
             </div>
@@ -501,7 +489,7 @@ export default function ReportIssuePage() {
               <input
                 id="network"
                 type="text"
-                value={formState.network}
+                value={displayNetwork}
                 readOnly
                 className={`${inputBase} ${inputReadOnly}`}
               />

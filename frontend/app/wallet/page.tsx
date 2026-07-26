@@ -34,7 +34,7 @@ export default function WalletDashboardPage() {
 
   const [balance, setBalance] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<HorizonTransaction[]>([]);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
   const [isFunding, setIsFunding] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -80,10 +80,32 @@ export default function WalletDashboardPage() {
 
   // Load initially when public key is available
   useEffect(() => {
-    if (publicKey) {
-      loadWalletDetails();
-    }
-  }, [publicKey, loadWalletDetails]);
+    if (!publicKey) return;
+    let cancelled = false;
+    Promise.all([
+      fetchXlmBalance(publicKey, activeNetwork),
+      fetchRecentTransactions(publicKey, activeNetwork),
+    ])
+      .then(([fetchedBalance, fetchedTxs]) => {
+        if (!cancelled) {
+          setBalance(fetchedBalance);
+          setTransactions(fetchedTxs);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Error loading wallet details:", err);
+        if (!cancelled) {
+          addToast({
+            type: "error",
+            message: "Failed to fetch wallet information from Stellar network.",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDetails(false);
+      });
+    return () => { cancelled = true; };
+  }, [publicKey, activeNetwork, addToast]);
 
   // Truncate address for display
   const shortenAddress = (address: string) => {

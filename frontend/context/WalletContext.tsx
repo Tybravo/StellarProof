@@ -46,6 +46,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [networkDetails, setNetworkDetails] = useState<NetworkDetails | null>(null);
 
+  if (!mounted) {
+    setMounted(true);
+  }
+
   const refreshNetwork = useCallback(async () => {
     try {
       const details = await walletService.getNetworkDetails();
@@ -60,7 +64,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     walletService.isInstalled().then((installed) => {
       if (!cancelled) setIsFreighterInstalled(installed);
     });
-    setMounted(true);
     return () => {
       cancelled = true;
     };
@@ -82,10 +85,23 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted || !isConnected) return;
-    refreshNetwork();
-    const interval = setInterval(refreshNetwork, NETWORK_POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [mounted, isConnected, refreshNetwork]);
+    let cancelled = false;
+
+    walletService.getNetworkDetails()
+      .then((details) => { if (!cancelled) setNetworkDetails(details); })
+      .catch(() => { if (!cancelled) setNetworkDetails(null); });
+
+    const interval = setInterval(() => {
+      walletService.getNetworkDetails()
+        .then((details) => setNetworkDetails(details))
+        .catch(() => setNetworkDetails(null));
+    }, NETWORK_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [mounted, isConnected]);
 
   const clearError = useCallback(() => setConnectError(null), []);
 

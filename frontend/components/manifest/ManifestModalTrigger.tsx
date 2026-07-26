@@ -1,7 +1,6 @@
 'use client';
 
 import { useSearchParams, usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
 import { SuspenseWrapper } from '../common/SuspenseWrapper';
 
 interface ManifestModalTriggerProps {
@@ -13,27 +12,20 @@ function ManifestModalTriggerContent({ className, children }: ManifestModalTrigg
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
 
   const manifestId = searchParams.get('manifestId');
-  const isModalOpen = searchParams.get('modal') === 'manifest';
-
-  useEffect(() => {
-    setIsOpen(isModalOpen);
-  }, [isModalOpen]);
+  const isOpen = searchParams.get('modal') === 'manifest';
 
   const openModal = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('modal', 'manifest');
     router.push(`${pathname}?${params.toString()}`);
-    setIsOpen(true);
   };
 
   const closeModal = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('modal');
     router.push(`${pathname}?${params.toString()}`);
-    setIsOpen(false);
   };
 
   return (

@@ -85,8 +85,22 @@ export default function FeeEstimator({
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    fetchFeeData()
+      .then((data) => {
+        if (!cancelled) {
+          setFeeData(data);
+          setLastUpdated(new Date());
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to fetch fee estimate. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!refreshInterval) return;

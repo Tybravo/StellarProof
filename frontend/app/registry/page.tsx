@@ -270,18 +270,23 @@ export default function RegistryPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+    registryService.getRegistry()
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load registry data. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleRefresh = useCallback(() => {
     fetchData(true);
   }, [fetchData]);
-
-  // Reset pagination to page 1 on search change
-  useEffect(() => {
-    setTeePage(1);
-    setOraclePage(1);
-  }, [search]);
 
   const normalizedSearch = search.toLowerCase().trim();
 
@@ -396,7 +401,11 @@ export default function RegistryPage() {
             aria-label="Search registry"
             placeholder="Search hashes, providers, addresses…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setTeePage(1);
+              setOraclePage(1);
+            }}
             className="w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
           />
         </div>

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { useAuth } from "@/app/context/AuthContext";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface PricingTier {
@@ -81,11 +81,6 @@ export default function PricingPage() {
   const [currency, setCurrency] = useState<"USD" | "XLM">("USD");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedPreference, setSelectedPreference] = useState<string | null>(null);
-
-  const handleCurrencyChange = (newCurrency: "USD" | "XLM") => {
-    setCurrency(newCurrency);
-    setIsDropdownOpen(false);
-  };
 
   const handlePreferenceSave = () => {
     if (isAuthenticated && selectedPreference) {

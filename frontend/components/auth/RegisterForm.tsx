@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -40,13 +40,13 @@ export default function RegisterForm() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     mode: "onBlur",
   });
 
-  const passwordValue = watch("password", "");
+  const passwordValue = useWatch({ control, name: "password", defaultValue: "" });
   const strength = passwordValue ? getPasswordStrength(passwordValue) : null;
 
   const onSubmit = async (data: RegisterFormValues) => {

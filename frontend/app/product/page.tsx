@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Search, Check, Clock, Copy, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import Header from "@/components/Header";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { fetchDigitalProducts, type DigitalProduct } from "@/services/productMock";
@@ -89,10 +90,11 @@ function ProductCard({ product }: { product: DigitalProduct }) {
       className="group rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative h-48 overflow-hidden">
-        <img
+        <Image
           src={product.imageUrl}
           alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute top-3 right-3">
           <StatusBadge status={product.status} />
@@ -187,8 +189,19 @@ export default function DigitalProductPage() {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    let cancelled = false;
+    fetchDigitalProducts()
+      .then((result) => {
+        if (!cancelled) setProducts(result);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load digital products. Please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleRefresh = useCallback(() => {
     fetchProducts(true);

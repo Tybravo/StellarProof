@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useToast } from "@/context/ToastContext";
 
 interface VerifyPasswordFormValues {
@@ -37,18 +37,18 @@ export default function VerifyPasswordPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<VerifyPasswordFormValues>({
     mode: "onBlur",
   });
 
-  const newPasswordValue = watch("newPassword", "");
+  const newPasswordValue = useWatch({ control, name: "newPassword", defaultValue: "" });
   const strength = newPasswordValue
     ? getPasswordStrength(newPasswordValue)
     : null;
 
-  const onSubmit = async (data: VerifyPasswordFormValues) => {
+  const onSubmit = async () => {
     setIsLoading(true);
     try {
       // Mock submission for now

@@ -23,13 +23,18 @@ function truncateHash(hash: string): string {
 
 function StatusBadge({ status }: { status: VerificationStatus }) {
   const styles: Record<VerificationStatus, string> = {
-    verified: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    processing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    verified:
+      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    pending:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    processing:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${styles[status]}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${styles[status]}`}
+    >
       {status}
     </span>
   );
@@ -45,7 +50,9 @@ function AuthPrompt() {
         Access Your StellarProof Dashboard
       </h3>
       <p className="mb-8 max-w-md text-sm text-gray-500 dark:text-gray-400">
-        Sign in with your email account or connect your Freighter wallet to view your verified products, manifests, attestations, and content provenance certificates.
+        Sign in with your email account or connect your Freighter wallet to
+        view your verified products, manifests, attestations, and content
+        provenance certificates.
       </p>
 
       <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -133,12 +140,12 @@ export default function DashboardPage() {
 
   const totalPages = useMemo(
     () => Math.ceil(requests.length / pageSize),
-    [requests.length, pageSize]
+    [requests.length, pageSize],
   );
 
   const paginatedRequests = useMemo(
     () => requests.slice((page - 1) * pageSize, page * pageSize),
-    [requests, page, pageSize]
+    [requests, page, pageSize],
   );
 
   const handlePageSizeChange = (size: number) => {
@@ -146,7 +153,10 @@ export default function DashboardPage() {
     setPage(1);
   };
 
-  const displayName = user?.name || user?.email || (publicKey ? `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Creator");
+  const displayName =
+    user?.name ||
+    user?.email ||
+    (publicKey ? `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Creator");
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans">
@@ -160,7 +170,9 @@ export default function DashboardPage() {
               User Verification Dashboard
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Welcome back, <span className="font-semibold text-primary">{displayName}</span>! Access and verify your digital media provenance.
+              Welcome back,{" "}
+              <span className="font-semibold text-primary">{displayName}</span>!
+              Access and verify your digital media provenance.
             </p>
           </div>
 
@@ -246,7 +258,8 @@ export default function DashboardPage() {
                     {/* Controls */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-darkblue p-4 rounded-xl border border-gray-200 dark:border-white/10">
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Showing {requests.length} verification request{requests.length !== 1 ? "s" : ""}
+                        Showing {requests.length} verification request
+                        {requests.length !== 1 ? "s" : ""}
                       </p>
                       <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <span>Rows per page:</span>
@@ -271,16 +284,21 @@ export default function DashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200 dark:divide-white/10 text-left">
                         <thead className="bg-gray-50 dark:bg-white/5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                           <tr>
-                            {["Date", "Request ID", "Content Hash", "Status", "Actions"].map((h) => (
-                              <th key={h} className="px-6 py-3.5">
-                                {h}
-                              </th>
-                            ))}
+                            {["Date", "Request ID", "Content Hash", "Status", "Actions"].map(
+                              (h) => (
+                                <th key={h} className="px-6 py-3.5">
+                                  {h}
+                                </th>
+                              ),
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-white/10 text-sm">
                           {paginatedRequests.map((req) => (
-                            <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                            <tr
+                              key={req.id}
+                              className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                            >
                               <td className="whitespace-nowrap px-6 py-4 text-gray-700 dark:text-gray-300">
                                 {req.date}
                               </td>
@@ -320,7 +338,9 @@ export default function DashboardPage() {
                             </span>
                             <StatusBadge status={req.status} />
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{req.date}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            {req.date}
+                          </p>
                           <p className="font-mono text-xs text-gray-500 dark:text-gray-400 mb-3">
                             {truncateHash(req.contentHash)}
                           </p>

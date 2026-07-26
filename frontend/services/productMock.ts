@@ -41,7 +41,10 @@ export interface DigitalProduct {
   certificate?: CertificateData;
 }
 
-export const fetchDigitalProducts = async (): Promise<DigitalProduct[]> => {
+export const fetchDigitalProducts = async (
+  __publicKey?: string
+): Promise<DigitalProduct[]> => {
+  void __publicKey
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve([
