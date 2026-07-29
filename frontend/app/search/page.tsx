@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   AlertCircle,
   List,
+  LayoutGrid,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../components/Header";
@@ -16,8 +17,24 @@ import {
   searchCertificates,
 } from "./services/searchService";
 import { ListView } from "./components/ListView";
+import { GridView } from "./components/GridView";
 import type { SearchResult } from "./types";
 import { cn } from "../../utils/cn";
+
+type ViewMode = "list" | "grid";
+
+const VIEW_STORAGE_KEY = "searchViewPreference";
+
+function readViewPreference(): ViewMode {
+  if (typeof window === "undefined") return "list";
+  try {
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (stored === "list" || stored === "grid") return stored;
+  } catch {
+    // localStorage unavailable (e.g. privacy mode).
+  }
+  return "list";
+}
 
 /**
  * Debounce delay between keystrokes and the actual search call (ms).
@@ -27,8 +44,9 @@ const SEARCH_DEBOUNCE_MS = 300;
 /**
  * Global Certificate Search page.
  *
- * Displays a list of verified or pending certificates indexed across
- * the StellarProof network. Includes a search input, status summary,
+ * Displays a list or grid of verified or pending certificates indexed
+ * across the StellarProof network. Includes a search input, status
+ * summary, view toggle (list/grid) with localStorage persistence,
  * and zero / loading states.
  */
 export default function SearchPage() {
@@ -42,6 +60,8 @@ export default function SearchPage() {
   // Start in loading state so the first paint shows the skeleton.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** View mode (list vs grid), initialised from localStorage. */
+  const [viewMode, setViewMode] = useState<ViewMode>(readViewPreference);
 
   /* ---------------------------------------------------------------- */
   /*              Initial dataset load on mount                      */
@@ -70,6 +90,17 @@ export default function SearchPage() {
       cancelled = true;
     };
   }, []);
+
+  /* ---------------------------------------------------------------- */
+  /*          Persist view preference to localStorage                */
+  /* ---------------------------------------------------------------- */
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+    } catch {
+      // localStorage unavailable.
+    }
+  }, [viewMode]);
 
   /* ---------------------------------------------------------------- */
   /*              Debounced search on query change                   */
@@ -164,10 +195,44 @@ export default function SearchPage() {
                 ? "Loading…"
                 : `${totalCount} total result${totalCount === 1 ? "" : "s"}`}
             </span>
-            <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-primary">
-              <List className="w-3.5 h-3.5" aria-hidden />
-              List view
-            </span>
+
+            {/* ── View toggle button group ──────────────────────────── */}
+            <div
+              className="ml-auto inline-flex items-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-0.5"
+              role="radiogroup"
+              aria-label="View mode"
+            >
+              <button
+                role="radio"
+                aria-checked={viewMode === "list"}
+                aria-label="List view"
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200",
+                  viewMode === "list"
+                    ? "bg-primary/10 text-primary shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                )}
+              >
+                <List className="w-3.5 h-3.5" aria-hidden />
+                <span className="hidden sm:inline">List</span>
+              </button>
+              <button
+                role="radio"
+                aria-checked={viewMode === "grid"}
+                aria-label="Grid view"
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200",
+                  viewMode === "grid"
+                    ? "bg-primary/10 text-primary shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                )}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" aria-hidden />
+                <span className="hidden sm:inline">Grid</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -225,16 +290,28 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* ─── Results list view ────────────────────────────────────── */}
-        <ListView
-          results={results}
-          isLoading={loading}
-          emptyMessage={
-            query.trim()
-              ? `No certificates match "${query.trim()}"`
-              : "No certificates have been indexed yet."
-          }
-        />
+        {/* ─── Results view (list or grid) ──────────────────────────── */}
+        {viewMode === "list" ? (
+          <ListView
+            results={results}
+            isLoading={loading}
+            emptyMessage={
+              query.trim()
+                ? `No certificates match "${query.trim()}"`
+                : "No certificates have been indexed yet."
+            }
+          />
+        ) : (
+          <GridView
+            results={results}
+            isLoading={loading}
+            emptyMessage={
+              query.trim()
+                ? `No certificates match "${query.trim()}"`
+                : "No certificates have been indexed yet."
+            }
+          />
+        )}
       </main>
     </div>
   );
