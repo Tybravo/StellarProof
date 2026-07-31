@@ -157,6 +157,13 @@ export default function SearchPage() {
 
   const verifiedCount = results.filter((r) => r.status === "verified").length;
   const totalCount = results.length;
+  const gridResults: Certificate[] = results.map((r) => ({
+    id: r.id,
+    title: r.name || "Untitled Certificate",
+    thumbnailUrl: `https://picsum.photos/seed/${r.id}/400/300`,
+    issuerName: r.creator,
+    issueDate: r.mintedAt,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans">
@@ -298,7 +305,7 @@ export default function SearchPage() {
           />
         ) : (
           <GridView
-            results={results}
+            results={gridResults}
             isLoading={loading}
           />
         )}
