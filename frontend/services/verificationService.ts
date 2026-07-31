@@ -146,8 +146,9 @@ export interface VerificationRequest {
   certificateId?: string;
 }
 
-export const getVerificationRequests = async (): Promise<VerificationRequest[]> => {
+export const getVerificationRequests = async (publicKey: string): Promise<VerificationRequest[]> => {
   try {
+    void publicKey;
     return getMockRequests();
   } catch (error) {
     console.error('Error fetching verification requests:', error);
