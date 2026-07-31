@@ -150,7 +150,7 @@ export default function AssetTable({
   const itemsPerPage = 10;
 
   const sortedAssets = useMemo(() => {
-    let sortableItems = [...assets];
+    const sortableItems = [...assets];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {

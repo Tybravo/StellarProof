@@ -92,7 +92,7 @@ export const submitVerificationRequest = async (
       if (submittedTransaction.result_xdr) {
         certificateId = submittedTransaction.hash.substring(0, 8);
       }
-    } catch (_parseError) {
+    } catch {
       // Silent catch - certificate ID is optional
     }
 
@@ -146,7 +146,7 @@ export interface VerificationRequest {
   certificateId?: string;
 }
 
-export const getVerificationRequests = async (_publicKey: string): Promise<VerificationRequest[]> => {
+export const getVerificationRequests = async (): Promise<VerificationRequest[]> => {
   try {
     return getMockRequests();
   } catch (error) {
@@ -170,10 +170,12 @@ function getMockRequests(): VerificationRequest[] {
 }
 
 export const checkVerificationStatus = async (
-  _requestId: string,
-  _publicKey: string
+  requestId: string,
+  publicKey: string
 ): Promise<VerificationStatus> => {
   try {
+    void requestId;
+    void publicKey;
     await new Promise((resolve) => setTimeout(resolve, 500));
     const statuses: VerificationStatus[] = ['pending', 'verified', 'failed'];
     return statuses[Math.floor(Math.random() * statuses.length)];

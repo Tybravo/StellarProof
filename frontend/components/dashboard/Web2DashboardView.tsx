@@ -57,8 +57,6 @@ export default function Web2DashboardView({ userEmail = "user@example.com", user
   const [certificates, setCertificates] = useState<MockCertificate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [pageSize, setPageSize] = useState<number>(10);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedInspectItem, setSelectedInspectItem] = useState<{ title: string; data: Record<string, unknown> } | null>(null);
 
   useEffect(() => {

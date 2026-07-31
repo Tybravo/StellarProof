@@ -1,7 +1,18 @@
-import { manifestSchema, validateManifest } from '../schemas/manifest-schema';
+import { validateManifest } from '../schemas/manifest-schema';
+
+type ValidManifestPayload = {
+  contentHash: string;
+  creator: string;
+  timestamp: string;
+  metadata: {
+    device: string;
+    location: string;
+    aiModel: string;
+  };
+};
 
 describe('Manifest Schema Validation', () => {
-  const validPayload = {
+  const validPayload: ValidManifestPayload = {
     contentHash: 'sha256:d2a84f4b8b650937ec8f73cd8be2c74add5a911ba64df27458ed8229da804a26',
     creator: 'GA2C5RFPE6GCKIG3EQKTNIQ6PRRQIHIRDIUCAUKENRXCVZBD4T6K2K2H',
     timestamp: '2023-10-27T10:00:00Z',
@@ -30,13 +41,13 @@ describe('Manifest Schema Validation', () => {
     const result = validateManifest(extendedPayload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect((result.data as any).extraField).toBe('some extra value');
+      expect(result.data).toMatchObject({ extraField: 'some extra value' });
     }
   });
 
   describe('Invalid Payloads', () => {
     it('should fail if contentHash is missing', () => {
-      const { contentHash, ...invalidPayload } = validPayload;
+      const { contentHash: _contentHash, ...invalidPayload } = validPayload;
       const result = validateManifest(invalidPayload);
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -74,7 +85,7 @@ describe('Manifest Schema Validation', () => {
 
   describe('Form Submission Logic', () => {
     it('should simulate form submission failure with invalid schema', () => {
-      const formSubmit = (data: any) => {
+      const formSubmit = (data: unknown) => {
         const result = validateManifest(data);
         if (!result.success) {
           throw new Error('Validation failed');
@@ -87,7 +98,7 @@ describe('Manifest Schema Validation', () => {
     });
 
     it('should simulate form submission success with valid schema', () => {
-      const formSubmit = (data: any) => {
+      const formSubmit = (data: unknown) => {
         const result = validateManifest(data);
         if (!result.success) {
           throw new Error('Validation failed');
