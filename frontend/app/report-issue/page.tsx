@@ -38,6 +38,11 @@ const ACCEPTED_IMAGE_MIME_TYPES = [
   "image/gif",
   "image/webp",
 ];
+const ACCEPTED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
+const ACCEPTED_MIME_TYPES = [
+  ...ACCEPTED_IMAGE_MIME_TYPES,
+  ...ACCEPTED_VIDEO_MIME_TYPES,
+];
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
 
 function detectNetwork(): string {
@@ -118,10 +123,10 @@ export default function ReportIssuePage() {
   const processAttachment = (file: File | null | undefined) => {
     if (!file) return;
 
-    if (!ACCEPTED_IMAGE_MIME_TYPES.includes(file.type)) {
+    if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
       setErrors((prev) => ({
         ...prev,
-        attachment: "Only PNG, JPG, JPEG, GIF, or WEBP files are allowed",
+        attachment: "Only image (PNG, JPG, GIF, WEBP) or video (MP4, WEBM) files are allowed",
       }));
       return;
     }
@@ -195,8 +200,8 @@ export default function ReportIssuePage() {
     }
 
     if (formState.attachment) {
-      if (!ACCEPTED_IMAGE_MIME_TYPES.includes(formState.attachment.type)) {
-        nextErrors.attachment = "Only PNG, JPG, JPEG, GIF, or WEBP files are allowed";
+      if (!ACCEPTED_MIME_TYPES.includes(formState.attachment.type)) {
+        nextErrors.attachment = "Only image or video files are allowed";
       } else if (formState.attachment.size > MAX_ATTACHMENT_SIZE) {
         nextErrors.attachment = "File size must not exceed 5MB";
       }
@@ -405,7 +410,7 @@ export default function ReportIssuePage() {
                   ref={fileInputRef}
                   id="attachment"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -420,7 +425,7 @@ export default function ReportIssuePage() {
                 <p
                   className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}
                 >
-                  PNG, JPG, JPEG, GIF, or WEBP (max 5MB)
+                  Image or Video (max 5MB)
                 </p>
               </div>
               {errors.attachment && (
@@ -429,13 +434,23 @@ export default function ReportIssuePage() {
               {attachmentPreview && (
                 <div className="mt-4">
                   <div className="relative inline-block">
-                    <Image
-                      src={attachmentPreview}
-                      alt="Preview"
-                      width={192}
-                      height={192}
-                      className="max-h-48 rounded-md object-contain"
-                    />
+                    {formState.attachment?.type.startsWith("image/") ? (
+                      <Image
+                        src={attachmentPreview}
+                        alt="Preview"
+                        width={192}
+                        height={192}
+                        className="max-h-48 w-auto rounded-md object-contain"
+                      />
+                    ) : (
+                      <video
+                        src={attachmentPreview}
+                        width="192"
+                        height="192"
+                        className="max-h-48 w-auto rounded-md"
+                        aria-label="Video preview"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={removeAttachment}

@@ -6,12 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { ManifestUseCase } from "@/services/manifestUseCases";
 import { useDuplicateKeyValidation } from "@/utils/manifestValidation";
 
-export type KeyValuePair = {
+type KeyValuePair = {
   key: string;
   value: string;
 };
-
-const EMPTY_PAIR: KeyValuePair = { key: "", value: "" };
 
 interface Props {
   open: boolean;
@@ -19,20 +17,10 @@ interface Props {
   onClose: () => void;
   /** Called with the generated JSON string when the user clicks "Generate Manifest". */
   onGenerated?: (content: string) => void;
-  /** Pre-filled key/value pairs to seed the form with when it opens, e.g. known creator details. */
-  initialPairs?: KeyValuePair[];
 }
 
-export default function ManifestGeneratorModal({
-  open,
-  useCase,
-  onClose,
-  onGenerated,
-  initialPairs,
-}: Props) {
-  const [pairs, setPairs] = useState<KeyValuePair[]>(
-    initialPairs && initialPairs.length > 0 ? initialPairs : [EMPTY_PAIR],
-  );
+export default function ManifestGeneratorModal({ open, useCase, onClose, onGenerated }: Props) {
+  const [pairs, setPairs] = useState<KeyValuePair[]>([{ key: "", value: "" }]);
   const [submitted, setSubmitted] = useState(false);
 
   const validationRows = pairs.map((pair, index) => ({
@@ -44,14 +32,12 @@ export default function ManifestGeneratorModal({
 
   useEffect(() => {
     if (open && useCase) {
-      const seededPairs = initialPairs && initialPairs.length > 0 ? initialPairs : [EMPTY_PAIR];
       // Use setTimeout to avoid synchronous state update warning
       const timer = setTimeout(() => {
-        setPairs(seededPairs);
+        setPairs([{ key: "", value: "" }]);
       }, 0);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, useCase]);
 
   const handlePairChange = useCallback(

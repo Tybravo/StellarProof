@@ -1,9 +1,0 @@
-Figma Design Issues Worked on are:
-
-Figma (Light Mode): Global Certificate Search Results (List View) 
-Figma (Light Mode): Global Certificate Search Results (Grid View) 
-Figma (Light Mode): Digital Products / Assets (Table View) 
-Figma (Light Mode): Digital Products / Assets (Grid View)
-
-
-https://www.figma.com/design/2kP82C0Z8z0X3CncLQmfhB/Stellar-Project-Fig?node-id=227-2&p=f&t=LhlzEJ7fINwVaUuh-0

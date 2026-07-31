@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Upload,
   FileJson,
@@ -15,8 +15,7 @@ import {
 import { computeSHA256 } from '@/utils/crypto';
 import { useWizardStore } from '../../store/wizard.store';
 import type { ManifestData } from '../../types/wizard.types';
-import { useAuth } from '@/app/context/AuthContext';
-import ManifestGeneratorModal, { type KeyValuePair } from '@/components/ManifestGeneratorModal';
+import ManifestGeneratorModal from '@/components/ManifestGeneratorModal';
 import { manifestUseCaseService } from '@/services/manifestUseCases';
 import type { ManifestUseCase } from '@/services/manifestUseCases';
 
@@ -56,13 +55,6 @@ function parseAndValidate(content: string, fileName: string): ManifestData['form
 export default function UploadManifest() {
   const { formData, setManifest, setStepValid } = useWizardStore();
   const content = formData.content;
-  const { user } = useAuth();
-
-  const creatorPairs = useMemo<KeyValuePair[]>(() => {
-    if (!user) return [];
-    const creatorName = user.name || user.email;
-    return creatorName ? [{ key: 'creator', value: creatorName }] : [];
-  }, [user]);
 
   const [mode, setMode] = useState<Mode>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -412,7 +404,6 @@ export default function UploadManifest() {
         useCase={selectedUseCase}
         onClose={handleGeneratorClose}
         onGenerated={handleGenerated}
-        initialPairs={creatorPairs}
       />
     </div>
   );

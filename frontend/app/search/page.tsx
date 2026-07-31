@@ -16,8 +16,8 @@ import {
   fetchAllCertificates,
   searchCertificates,
 } from "./services/searchService";
-import { ListView } from "./components/ListView";
-import { GridView } from "./components/GridView";
+import ListView from "./components/ListView";
+import GridView, { Certificate } from "./components/GridView";
 import type { SearchResult } from "./types";
 import { cn } from "../../utils/cn";
 
@@ -158,6 +158,26 @@ export default function SearchPage() {
   const verifiedCount = results.filter((r) => r.status === "verified").length;
   const totalCount = results.length;
 
+  /**
+   * Maps the generic `SearchResult` type to the `Certificate` type required
+   * by the `GridView` component. This acts as an adapter.
+   */
+  const gridResults: Certificate[] = results.map((r) => ({
+    id: r.id,
+    title: r.name || "Untitled Certificate",
+    // Placeholder thumbnail logic. Replace with actual data when available.
+    thumbnailUrl:
+      r.type === "Image"
+        ? `https://picsum.photos/seed/${r.id}/400/300`
+        : r.type === "Video"
+          ? `https://picsum.photos/seed/${r.id}/400/300`
+          : r.type === "Audio"
+            ? `https://picsum.photos/seed/${r.id}/400/300`
+            : `https://picsum.photos/seed/${r.id}/400/300`,
+    issuerName: r.creator,
+    issueDate: r.mintedAt,
+  }));
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans">
       <Header />
@@ -295,21 +315,11 @@ export default function SearchPage() {
           <ListView
             results={results}
             isLoading={loading}
-            emptyMessage={
-              query.trim()
-                ? `No certificates match "${query.trim()}"`
-                : "No certificates have been indexed yet."
-            }
           />
         ) : (
           <GridView
             results={results}
             isLoading={loading}
-            emptyMessage={
-              query.trim()
-                ? `No certificates match "${query.trim()}"`
-                : "No certificates have been indexed yet."
-            }
           />
         )}
       </main>
