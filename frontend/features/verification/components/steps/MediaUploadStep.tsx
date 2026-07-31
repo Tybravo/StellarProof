@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useState, useRef, type DragEvent, type ChangeEvent } from 'react';
-import { Upload, FileImage, FileVideo, FileText, X, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
+import Image from 'next/image';
+import { Upload, FileImage, FileVideo, FileText, X, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
 export interface MediaFile {
@@ -99,6 +100,27 @@ export default function MediaUploadStep({
     [externalFiles, onFilesChange],
   );
 
+  const simulateUpload = useCallback(
+    async (fileId: string) => {
+      const updateProgress = (progress: number) => {
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId
+              ? { ...f, progress, status: progress >= 100 ? 'done' : 'uploading' }
+              : f,
+          ),
+        );
+      };
+
+      for (let p = 0; p <= 100; p += 20) {
+        await new Promise((r) => setTimeout(r, 150));
+        updateProgress(p);
+      }
+      updateProgress(100);
+    },
+    [setFiles],
+  );
+
   // ── File Processing ───────────────────────────────────
   const processFiles = useCallback(
     async (fileList: FileList | File[]) => {
@@ -152,26 +174,8 @@ export default function MediaUploadStep({
         await simulateUpload(entry.id);
       }
     },
-    [maxSize, multiple, files, setFiles],
+    [files, maxSize, multiple, setFiles, simulateUpload],
   );
-
-  const simulateUpload = async (fileId: string) => {
-    const updateProgress = (progress: number) => {
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileId
-            ? { ...f, progress, status: progress >= 100 ? 'done' : 'uploading' }
-            : f,
-        ),
-      );
-    };
-
-    for (let p = 0; p <= 100; p += 20) {
-      await new Promise((r) => setTimeout(r, 150));
-      updateProgress(p);
-    }
-    updateProgress(100);
-  };
 
   // ── Drag Handlers ─────────────────────────────────────
   const handleDragEnter = useCallback((e: DragEvent) => {
@@ -358,10 +362,12 @@ export default function MediaUploadStep({
                   {file.previewUrl ? (
                     <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
                       {isImage ? (
-                        <img
+                        <Image
                           src={file.previewUrl}
                           alt={file.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          unoptimized
+                          className="object-cover"
                         />
                       ) : isVideo ? (
                         <video

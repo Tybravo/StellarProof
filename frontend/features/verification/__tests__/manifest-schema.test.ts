@@ -47,7 +47,9 @@ describe('Manifest Schema Validation', () => {
 
   describe('Invalid Payloads', () => {
     it('should fail if contentHash is missing', () => {
-      const { contentHash: _contentHash, ...invalidPayload } = validPayload;
+      const invalidPayload = Object.fromEntries(
+        Object.entries(validPayload).filter(([key]) => key !== 'contentHash'),
+      );
       const result = validateManifest(invalidPayload);
       expect(result.success).toBe(false);
       if (!result.success) {

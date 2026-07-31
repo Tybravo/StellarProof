@@ -158,26 +158,6 @@ export default function SearchPage() {
   const verifiedCount = results.filter((r) => r.status === "verified").length;
   const totalCount = results.length;
 
-  /**
-   * Maps the generic `SearchResult` type to the `Certificate` type required
-   * by the `GridView` component. This acts as an adapter.
-   */
-  const gridResults: Certificate[] = results.map((r) => ({
-    id: r.id,
-    title: r.name || "Untitled Certificate",
-    // Placeholder thumbnail logic. Replace with actual data when available.
-    thumbnailUrl:
-      r.type === "Image"
-        ? `https://picsum.photos/seed/${r.id}/400/300`
-        : r.type === "Video"
-          ? `https://picsum.photos/seed/${r.id}/400/300`
-          : r.type === "Audio"
-            ? `https://picsum.photos/seed/${r.id}/400/300`
-            : `https://picsum.photos/seed/${r.id}/400/300`,
-    issuerName: r.creator,
-    issueDate: r.mintedAt,
-  }));
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#020617] font-sans">
       <Header />
