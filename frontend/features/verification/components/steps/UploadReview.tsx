@@ -6,6 +6,7 @@ import {
   Edit2,
   FileJson,
   ShieldCheck,
+  ShieldAlert,
   Hash,
   FileText,
   Send,
@@ -13,6 +14,7 @@ import {
   Upload,
   Wallet,
   AlertCircle,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useWizardStore } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
@@ -99,6 +101,9 @@ export default function UploadReview({
   const [isConnecting, setIsConnecting] = useState(false);
 
   const modeName = content?.encryptionEnabled ? 'KMS Encrypted' : 'Public';
+  const modeDescription = content?.encryptionEnabled
+    ? 'Restricted access through managed decryption keys.'
+    : 'Readable directly from the public registry for open verification.';
   const contentHashValid = isValidSHA256(content?.contentHash ?? '');
   const hasManifest = content?.manifest !== null && content?.manifest !== undefined;
 
@@ -130,7 +135,25 @@ export default function UploadReview({
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-3">
         <SectionHeader icon={<Upload className="w-4 h-4" />} title="Uploaded File" stepIndex={0} onNavigate={onNavigate} />
         {content?.file ? (
-          <FieldRow label="File" value={`${content.file.name} (${(content.file.size / 1024).toFixed(1)} KB)`} />
+          <div className="flex items-center gap-4">
+            {content.file.previewUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={content.file.previewUrl}
+                alt={`${content.file.name} preview`}
+                className="h-16 w-16 rounded-xl object-cover border border-gray-200 dark:border-gray-700"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-800/60">
+                <ImageIcon className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1 space-y-2">
+              <FieldRow label="File" value={content.file.name} />
+              <FieldRow label="Size" value={`${(content.file.size / 1024).toFixed(1)} KB`} />
+              <FieldRow label="Type" value={content.file.type || 'Unknown'} missing={!content.file.type} />
+            </div>
+          </div>
         ) : (
           <p className="text-xs text-gray-400 italic">No file uploaded.</p>
         )}
@@ -138,16 +161,28 @@ export default function UploadReview({
 
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4">
         <SectionHeader icon={<FileText className="w-4 h-4" />} title="Verification Mode" />
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-            content?.encryptionEnabled
-              ? 'bg-green-100 text-green-700'
-              : 'bg-blue-100 text-blue-700'
-          }`}
-        >
-          {content?.encryptionEnabled && <ShieldCheck className="w-3 h-3" />}
-          {modeName}
-        </span>
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/80 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+          <div className="space-y-1">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                content?.encryptionEnabled
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {content?.encryptionEnabled ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3" />}
+              {modeName}
+            </span>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{modeDescription}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate?.(2)}
+            className="text-xs text-blue-600 transition-colors hover:text-blue-700"
+          >
+            Edit SPV
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-3">
@@ -168,7 +203,11 @@ export default function UploadReview({
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-3">
         <SectionHeader icon={<FileJson className="w-4 h-4" />} title="Manifest" stepIndex={1} onNavigate={onNavigate} />
         {hasManifest && content?.manifestHash ? (
-          <FieldRow label="Manifest Hash" value={content.manifestHash} mono />
+          <div className="space-y-3">
+            <FieldRow label="Manifest File" value={content.manifest.fileName} />
+            <FieldRow label="Manifest Format" value={content.manifest.format.toUpperCase()} />
+            <FieldRow label="Manifest Hash" value={content.manifestHash} mono />
+          </div>
         ) : (
           <p className="text-xs text-gray-400 italic">No manifest attached.</p>
         )}

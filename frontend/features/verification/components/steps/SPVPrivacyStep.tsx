@@ -1,8 +1,21 @@
 'use client';
 
 import React, { useCallback, useEffect } from 'react';
-import { ShieldCheck, ShieldAlert, Globe, KeyRound, Check, HelpCircle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Globe, KeyRound, Check, HelpCircle, Info } from 'lucide-react';
 import { useWizardStore } from '../../store/wizard.store';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+const PRIVACY_TOOLTIPS = {
+  public:
+    'Public keeps the provenance record readable on-chain so anyone can inspect and verify it instantly.',
+  encrypted:
+    'KMS Encrypted seals the provenance payload before submission so only authorized viewers can decrypt it.',
+};
 
 export default function SPVPrivacyStep() {
   const { formData, setEncryptionEnabled, setStepValid } = useWizardStore();
@@ -27,8 +40,19 @@ export default function SPVPrivacyStep() {
     setEncryptionEnabled(!encryptionEnabled);
   }, [encryptionEnabled, setEncryptionEnabled]);
 
+  const handleOptionKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>, nextValue: boolean) => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        setEncryptionEnabled(nextValue);
+      }
+    },
+    [setEncryptionEnabled],
+  );
+
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8 py-2">
+    <TooltipProvider>
+      <div className="w-full max-w-2xl mx-auto space-y-8 py-2">
       {/* Intro info header */}
       <div className="text-center space-y-2 mb-2">
         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
@@ -43,11 +67,12 @@ export default function SPVPrivacyStep() {
         className="grid grid-cols-1 md:grid-cols-2 gap-6"
       >
         {/* PUBLIC REGISTRY CARD */}
-        <button
-          type="button"
+        <div
           role="radio"
           aria-checked={!encryptionEnabled}
+          tabIndex={0}
           onClick={selectPublic}
+          onKeyDown={(event) => handleOptionKeyDown(event, false)}
           className={`flex flex-col text-left p-6 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ${
             !encryptionEnabled
               ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.01] shadow-glow'
@@ -77,6 +102,21 @@ export default function SPVPrivacyStep() {
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                 Public Registry
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Explain Public Registry privacy option"
+                      className="rounded-full text-gray-400 transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {PRIVACY_TOOLTIPS.public}
+                  </TooltipContent>
+                </Tooltip>
               </h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 Standard On-Chain Storage
@@ -103,14 +143,15 @@ export default function SPVPrivacyStep() {
               </div>
             </div>
           </div>
-        </button>
+        </div>
 
         {/* KMS ENCRYPTED CARD */}
-        <button
-          type="button"
+        <div
           role="radio"
           aria-checked={encryptionEnabled}
+          tabIndex={0}
           onClick={selectEncrypted}
+          onKeyDown={(event) => handleOptionKeyDown(event, true)}
           className={`flex flex-col text-left p-6 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ${
             encryptionEnabled
               ? 'border-primary bg-primary/[0.03] dark:bg-primary/[0.01] shadow-glow'
@@ -140,6 +181,21 @@ export default function SPVPrivacyStep() {
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                 KMS Encrypted
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Explain KMS Encrypted privacy option"
+                      className="rounded-full text-gray-400 transition hover:text-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {PRIVACY_TOOLTIPS.encrypted}
+                  </TooltipContent>
+                </Tooltip>
               </h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 Sealed Provenance Vault
@@ -166,7 +222,7 @@ export default function SPVPrivacyStep() {
               </div>
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       {/* Sync Toggle Switch & Description */}
@@ -227,6 +283,7 @@ export default function SPVPrivacyStep() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

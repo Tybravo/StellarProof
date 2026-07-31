@@ -8,7 +8,7 @@ import WizardNavigation from './WizardNavigation';
 import UploadMedia from './steps/UploadMedia';
 import UploadManifest from './steps/UploadManifest';
 import SPVPrivacyStep from './steps/SPVPrivacyStep';
-import UploadReview from './steps/UploadReview';
+import ReviewSubmitStep from './steps/ReviewSubmitStep';
 import { submitVerificationRequest } from '@/services/verificationService';
 
 const STEPS = [
@@ -88,7 +88,7 @@ export default function WizardPageShell() {
     <UploadMedia key="media" />,
     <UploadManifest key="manifest" />,
     <SPVPrivacyStep key="spv" />,
-    <UploadReview
+    <ReviewSubmitStep
       key="review"
       onNavigate={handleNavigate}
       onSubmit={handleSubmit}
