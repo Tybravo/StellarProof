@@ -105,7 +105,8 @@ export default function UploadReview({
     ? 'Restricted access through managed decryption keys.'
     : 'Readable directly from the public registry for open verification.';
   const contentHashValid = isValidSHA256(content?.contentHash ?? '');
-  const hasManifest = content?.manifest !== null && content?.manifest !== undefined;
+  const manifest = content?.manifest ?? null;
+  const hasManifest = manifest !== null;
 
   const canSubmit =
     contentHashValid && confirmed && walletConnected && !isSubmitting && !submitted;
@@ -204,8 +205,8 @@ export default function UploadReview({
         <SectionHeader icon={<FileJson className="w-4 h-4" />} title="Manifest" stepIndex={1} onNavigate={onNavigate} />
         {hasManifest && content?.manifestHash ? (
           <div className="space-y-3">
-            <FieldRow label="Manifest File" value={content.manifest.fileName} />
-            <FieldRow label="Manifest Format" value={content.manifest.format.toUpperCase()} />
+            <FieldRow label="Manifest File" value={manifest.fileName} />
+            <FieldRow label="Manifest Format" value={manifest.format.toUpperCase()} />
             <FieldRow label="Manifest Hash" value={content.manifestHash} mono />
           </div>
         ) : (
