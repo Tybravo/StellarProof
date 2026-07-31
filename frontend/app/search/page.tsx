@@ -151,7 +151,6 @@ export default function SearchPage() {
       setLoading(false);
       return;
     }
-
     setLoading(true);
   }
 
