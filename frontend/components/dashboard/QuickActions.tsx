@@ -3,7 +3,29 @@
 import Link from "next/link";
 import { ShieldCheck, Package } from "lucide-react";
 
-export default function QuickActions() {
+export interface QuickActionsProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export default function QuickActions({ activeTab, onSelectTab }: QuickActionsProps) {
+  const handleProductsClick = (e: React.MouseEvent) => {
+    if (onSelectTab) {
+      e.preventDefault();
+      onSelectTab("products");
+    }
+  };
+
+  const handleVerifyClick = (e: React.MouseEvent) => {
+    if (onSelectTab) {
+      e.preventDefault();
+      onSelectTab("verify");
+    }
+  };
+
+  const isProductsActive = activeTab === "products";
+  const isVerifyActive = activeTab === "verify";
+
   return (
     <section className="mb-8">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -14,7 +36,12 @@ export default function QuickActions() {
         {/* Verify Authenticity */}
         <Link
           href="/verify"
-          className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue p-6 shadow-sm hover:shadow-md transition-all"
+          onClick={handleVerifyClick}
+          className={`rounded-xl border p-6 shadow-sm hover:shadow-md transition-all text-left block ${
+            isVerifyActive
+              ? "border-primary bg-primary/5 dark:bg-primary/10 ring-2 ring-primary"
+              : "border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue"
+          }`}
         >
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
@@ -36,7 +63,12 @@ export default function QuickActions() {
         {/* My Products */}
         <Link
           href="/product"
-          className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue p-6 shadow-sm hover:shadow-md transition-all"
+          onClick={handleProductsClick}
+          className={`rounded-xl border p-6 shadow-sm hover:shadow-md transition-all text-left block ${
+            isProductsActive
+              ? "border-primary bg-primary/5 dark:bg-primary/10 ring-2 ring-primary"
+              : "border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue"
+          }`}
         >
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
@@ -57,4 +89,4 @@ export default function QuickActions() {
       </div>
     </section>
   );
-}
+}

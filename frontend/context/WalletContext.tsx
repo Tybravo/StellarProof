@@ -107,27 +107,35 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     setConnectError(null);
-    const installed = await walletService.isInstalled();
-    if (!installed) {
-      setConnectError("Freighter is not installed.");
-      return;
-    }
     setIsConnecting(true);
+
     try {
-      const address = await walletService.getAddress();
-      if (address) {
-        setPublicKey(address);
-        setIsConnected(true);
-        setConnectError(null);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, address);
-          localStorage.setItem("walletConnected", "true");
-        }
-        const details = await walletService.getNetworkDetails();
-        setNetworkDetails(details);
+      const installed = await walletService.isInstalled();
+      if (!installed) {
+        setConnectError("Freighter is not installed. Please install the extension and try again.");
+        return;
       }
+
+      const result = await walletService.requestAccess();
+      if (result.error || !result.address) {
+        throw new Error(result.error ?? "Unable to connect to Freighter.");
+      }
+
+      const address = result.address;
+      setPublicKey(address);
+      setIsConnected(true);
+      setConnectError(null);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, address);
+        localStorage.setItem("walletConnected", "true");
+      }
+
+      const details = await walletService.getNetworkDetails();
+      setNetworkDetails(details);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to connect.";
+      setPublicKey(null);
+      setIsConnected(false);
       setConnectError(message);
     } finally {
       setIsConnecting(false);
@@ -139,7 +147,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setIsConnected(false);
     setConnectError(null);
     setNetworkDetails(null);
-    if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem("walletConnected");
+    }
   }, []);
 
   const signTx = useCallback(async (xdr: string): Promise<string> => {

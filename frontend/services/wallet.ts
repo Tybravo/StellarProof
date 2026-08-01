@@ -21,10 +21,9 @@ export interface WalletService {
 
 async function isFreighterInstalled(): Promise<boolean> {
   try {
-    const { isConnected } = await import("@stellar/freighter-api");
-    const result = await isConnected();
-    const value = typeof result === "object" && result !== null ? result.isConnected : !!result;
-    return Boolean(value);
+    if (typeof window === "undefined") return false;
+    await import("@stellar/freighter-api");
+    return true;
   } catch {
     return false;
   }
