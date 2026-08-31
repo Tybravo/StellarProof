@@ -6,7 +6,20 @@ import Header from "@/components/Header";
 import { useAuth } from "@/app/context/AuthContext";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import PricingCards, { PricingTier } from "./components/PricingCards";
+import PricingTable from "./components/PricingTable";
+
+interface PricingTier {
+  name: string;
+  monthlyUSD: number;
+  monthlyXLM: number;
+  /** Yearly price: ten months' worth, i.e. two months free. */
+  yearlyUSD: number;
+  yearlyXLM: number;
+  description: string;
+  features: string[];
+  cta: string;
+  popular?: boolean;
+}
 
 const pricingTiers: PricingTier[] = [
   {
@@ -230,7 +243,7 @@ export default function PricingPage() {
         {/* Pricing Cards */}
         <PricingCards tiers={pricingTiers} currency={currency} />
 
-        {/* Plan Comparison Table */}
+        {/* Detailed feature comparison */}
         <PricingTable />
 
         {/* FAQ Section */}
