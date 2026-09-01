@@ -17,7 +17,7 @@ const SKELETON_COUNT = 6;
 
 /** True when a rejected promise stemmed from an intentional abort. */
 function isAbortError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === "AbortError";
+  return typeof err === "object" && err !== null && "name" in err && (err as Error).name === "AbortError";
 }
 
 function CreatorCardSkeleton() {
@@ -137,10 +137,13 @@ export default function CreatorsPage() {
     else setLoadingMore(true);
   }, [page]);
 
-  // Clearing only resets the input; the debounce effect applies the empty
-  // query and reloads the first page, and does nothing when the empty query
-  // is already the applied one.
-  const handleClearSearch = useCallback(() => setQuery(""), []);
+  const handleClearSearch = useCallback(() => {
+    setQuery("");
+    setAppliedQuery("");
+    setPage(0);
+    setLoadingInitial(true);
+    setError(null);
+  }, []);
 
   const showEmptyState = !busy && error === null && creators.length === 0;
 
@@ -165,7 +168,11 @@ export default function CreatorsPage() {
           <label htmlFor="creator-search" className="sr-only">
             Search creators
           </label>
-          <div className="relative">
+          <form 
+            className="relative"
+            onSubmit={(e) => e.preventDefault()}
+            role="search"
+          >
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               aria-hidden="true"
@@ -188,7 +195,7 @@ export default function CreatorsPage() {
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             )}
-          </div>
+          </form>
         </div>
 
         {/* Result summary, announced to assistive tech */}
