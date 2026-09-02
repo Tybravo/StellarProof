@@ -47,3 +47,6 @@ npm-shrinkwrap.json
 
 
 test_snapshots
+
+# For Codebase Development
+SUMMARY_TYPESCRIPT.md
