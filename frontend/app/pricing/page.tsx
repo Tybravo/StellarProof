@@ -7,6 +7,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PricingTable from "./components/PricingTable";
+import PricingCards from "./components/PricingCards";
 
 interface PricingTier {
   name: string;
@@ -20,6 +21,8 @@ interface PricingTier {
   cta: string;
   popular?: boolean;
 }
+
+type BillingPeriod = "monthly" | "yearly";
 
 const pricingTiers: PricingTier[] = [
   {
