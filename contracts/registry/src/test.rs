@@ -523,3 +523,38 @@ fn test_remove_tee_hash_non_admin_panics() {
     // admin.require_auth() will abort — no auth is mocked for admin.
     client.remove_tee_hash(&hash);
 }
+
+// ---------------------------------------------------------------------------
+// New: verify_and_mint failed-state test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_verify_and_mint_failed_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _admin) = setup(&env);
+    
+    let content = String::from_str(&env, "test content");
+    // We expect this to fail minting because the provenance address in setup is just a random address,
+    // not a real contract that implements the expected interface.
+    // However, if we pass the correct hash, verify_and_mint should return success=true, state=Failed.
+    
+    // Compute hash logic is internal, but we can guess it or just use verify_and_mint to get it.
+    // Let's pass a dummy hash first.
+    let dummy_hash = String::from_str(&env, "dummy");
+    let owner = Address::generate(&env);
+    
+    let result1 = client.verify_and_mint(&content, &dummy_hash, &owner);
+    assert!(!result1.success);
+    
+    let correct_hash = result1.content_hash;
+    
+    // Now call with correct hash
+    let result2 = client.verify_and_mint(&content, &correct_hash, &owner);
+    
+    assert!(result2.success);
+    // Minting fails (provenance addr is random), so state should be Failed
+    assert_eq!(result2.state, RequestState::Failed);
+    assert!(result2.certificate_id.is_none());
+}

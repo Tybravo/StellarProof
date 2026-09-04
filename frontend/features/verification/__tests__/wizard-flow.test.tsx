@@ -31,7 +31,10 @@ jest.mock('../components/steps/UploadManifest', () => {
       <div data-testid="step-2">
         <button 
           onClick={() => {
-            setManifest({ name: 'manifest.json' } as any, '0xabcdef123456');
+            setManifest(
+              { content: '', format: 'json', fileName: 'manifest.json', fileSize: 0 },
+              '0xabcdef123456',
+            );
             nextStep();
           }}
         >
