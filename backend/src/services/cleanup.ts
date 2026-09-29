@@ -4,6 +4,7 @@ import { VerificationJobModel } from '../models/verificationJob.model';
 import { cloudinary } from '../config/cloudinary';
 import { CleanedAsset, CleanupResult } from '../types/cleanup';
 import logger from '../utils/logger';
+import { pinLifecycleService } from './pinLifecycle.service';
 
 
 const ORPHAN_AGE_MS = (): number => {
@@ -19,7 +20,7 @@ const ORPHAN_AGE_MS = (): number => {
  *
  * Responsible for finding orphaned Asset documents and deleting them from
  * both MongoDB and their remote storage provider (Cloudinary for s3/cloud
- * assets, no-op for mongodb/ipfs providers).
+ * assets, Pinata unpin for ipfs assets, no-op for mongodb).
  *
  * An asset is "orphaned" when ALL of the following are true:
  *   1. It was created more than CLEANUP_ORPHAN_AGE_HOURS ago.
@@ -84,15 +85,22 @@ export class CleanupService {
           // below handles this. No separate remote call needed.
           return true;
 
-        case 'ipfs':
-          // IPFS is content-addressed and immutable. We cannot "delete" the
-          // content, but we can remove the DB reference so it is no longer
-          // tracked. Log a warning for observability.
-          logger.warn('IPFS asset marked orphaned — DB record will be removed but content persists on IPFS', {
+        case 'ipfs': {
+          // Release the Pinata pin so storage costs stay predictable. The pin
+          // is kept when another Asset or Manifest still references the CID.
+          const outcome = await pinLifecycleService.releaseIfUnreferenced(
+            asset.storageReferenceId,
+            [asset._id as mongoose.Types.ObjectId],
+          );
+
+          logger.info('IPFS orphan pin processed', {
             assetId: asset._id.toString(),
             cid: asset.storageReferenceId,
+            released: outcome.released,
+            skippedReason: outcome.skippedReason,
           });
           return true;
+        }
 
         default:
           logger.error('Unknown storage provider encountered during cleanup', {
@@ -154,6 +162,17 @@ export class CleanupService {
 
       // Step 1: Delete from remote storage.
       cleanedEntry.remoteDeleteSuccess = await this.deleteFromRemoteStorage(asset);
+
+      // A failed IPFS unpin keeps the DB record: it is the only pointer to the
+      // pin, so the next cycle retries the release instead of leaking it.
+      if (!cleanedEntry.remoteDeleteSuccess && asset.storageProvider === 'ipfs') {
+        result.totalFailed++;
+        result.errors.push(
+          `IPFS unpin failed for asset ${assetId.toString()} (${asset.storageReferenceId}); will retry next cycle`,
+        );
+        result.assets.push(cleanedEntry);
+        continue;
+      }
 
       // Step 2: Delete from MongoDB regardless of the remote result.
       // If the remote deletion failed we still remove the DB record to avoid

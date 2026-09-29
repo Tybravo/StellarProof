@@ -1,31 +1,14 @@
 /**
- * Verification worker: a long-running process that drives each
- * VerificationRequestEvent through the off-chain pipeline.
+ * Verification Worker - manifest re-hash and integrity comparison.
  *
- *   claim event → register request (dedup guard) → SPV verify
- *     → create/advance VerificationJob → attest → build + sign
- *     provenance.mint → submit → wait for SUCCESS → complete job
- *
- * Guarantees:
- * - One cycle at a time per worker (the next cycle is scheduled only after
- *   the current one finishes).
- * - One worker per event (atomic claim + lease; see the event service).
- * - One workflow per request: every pass first registers the request's
- *   identity (`eventId`) in the processed-request ledger, whose unique index
- *   arbitrates concurrent registrations. A request already settled there is
- *   never processed again; an in-flight one resumes from its checkpoints.
- * - SPV verification runs at most once per request: its verdict is
- *   checkpointed in the ledger and reused by retries.
- * - Transient failures are retried with exponential back-off up to
- *   `maxAttempts`; permanent failures are dead-lettered and fail the job.
- * - A job is marked completed only after the mint transaction is confirmed
- *   `SUCCESS` on-chain.
- * - Each event is processed in isolation: its failure is recorded and the
- *   worker moves on.
- * - Processing resumes from the job's current state, so a crash at any step
- *   is recovered when the event's lease expires and it is reclaimed.
- *
- * Run standalone: `pnpm worker:verification` (dev) or `pnpm start:worker`.
+ * Responsibilities:
+ * - `verifyManifestForJob`: runs the manifest integrity check for a single
+ *   VerificationJob (fetch manifest JSON from IPFS, recompute its
+ *   deterministic hash, compare to the on-chain/stored `manifestHash`).
+ *   Rejects (marks the job `failed`) on mismatch.
+ * - `startManifestRehashWorker`: periodically scans `pending` jobs that have
+ *   an associated manifest and runs the check on each, mirroring the
+ *   scan-and-update pattern used by `verificationTimeout.job.ts`.
  */
 import os from "os";
 import crypto from "crypto";
@@ -38,6 +21,7 @@ import {
   type OracleConfig,
   type VerificationWorkerConfig,
 } from "../config/oracle";
+import { env } from "../config/env";
 import { AppError } from "../errors/AppError";
 import {
   SorobanTransactionError,
@@ -63,6 +47,10 @@ import {
   type SpvVerificationResult,
 } from "../services/spvVerifier.service";
 import { verificationService } from "../services/verification.service";
+import { RegistryAuthorizationService } from "../services/registryAuthorization.service";
+import { SorobanContractQueryClient } from "../services/contracts/ContractReader";
+import { RegistryContract } from "../services/contracts/RegistryContract";
+import { OracleContract } from "../services/contracts/OracleContract";
 import {
   LeaseLostError,
   verificationRequestEventService,
@@ -135,6 +123,7 @@ export interface VerificationWorkerDeps {
   attestations: {
     createAttestation(input: AttestationInput, keypair: Keypair, codeMeasurementHash: string): Attestation;
   };
+  authorization?: Pick<RegistryAuthorizationService, "assertAuthorized">;
   soroban: Pick<
     SorobanService,
     "buildMintTransaction" | "submitTransaction" | "getTransactionWithConfirmation"
@@ -151,145 +140,24 @@ function describeError(err: unknown): string {
 }
 
 /**
- * Whether a later attempt could succeed. Unknown (non-application) errors,
- * such as a dropped database connection, are treated as transient.
+ * Runs the manifest integrity check for a single job. Fetches the
+ * manifest's stored JSON from IPFS, recomputes its deterministic hash, and
+ * compares it to the manifest's recorded `manifestHash`. On mismatch, the
+ * job is transitioned to `failed`.
  */
-export function isRetryableError(err: unknown): boolean {
-  if (err instanceof SorobanTransactionError) return err.retryable;
-  if (err instanceof SpvFetchError) return err.retryable;
-  if (err instanceof CidFetchError) return err.retryable;
-  if (err instanceof AppError) return false;
-  return true;
+export async function verifyManifestForJob(
+  jobId: string
+): Promise<IVerificationJob> {
+  return verificationService.verifyManifestIntegrity(jobId);
 }
 
-/** True when a previously submitted transaction definitely did not take effect. */
-function transactionDidNotLand(err: unknown): boolean {
-  return (
-    (err instanceof TransactionFailedError && err.diagnostics.ledger !== undefined) ||
-    (err instanceof TransactionConfirmationTimeoutError && !err.outcomeUnknown)
-  );
-}
-
-function isTerminal(status: VerificationStatus): boolean {
-  return status === VerificationStatus.COMPLETED || status === VerificationStatus.FAILED;
-}
-
-function isSettled(entry: RequestLedgerEntry): boolean {
-  return entry.status === ProcessedRequestStatus.COMPLETED || entry.status === ProcessedRequestStatus.FAILED;
-}
-
-export class VerificationWorker {
-  private readonly workerId: string;
-  private readonly now: () => Date;
-  private timer: NodeJS.Timeout | null = null;
-  private currentCycle: Promise<number> | null = null;
-  private running = false;
-  private stopRequested = false;
-
-  constructor(private readonly deps: VerificationWorkerDeps) {
-    this.workerId =
-      deps.workerId ?? `${os.hostname()}:${process.pid}:${crypto.randomBytes(4).toString("hex")}`;
-    this.now = deps.now ?? (() => new Date());
-  }
-
-  get id(): string {
-    return this.workerId;
-  }
-
-  get isRunning(): boolean {
-    return this.running;
-  }
-
-  /** Starts polling immediately, then every `pollIntervalMs` after each cycle ends. */
-  start(): void {
-    if (this.running) return;
-    this.running = true;
-    this.stopRequested = false;
-    this.deps.logger.info("Verification worker: started", {
-      workerId: this.workerId,
-      pollIntervalMs: this.deps.config.pollIntervalMs,
-      batchSize: this.deps.config.batchSize,
-      oracle: this.deps.oracle.keypair.publicKey(),
-    });
-    this.scheduleNext(0);
-  }
-
-  /** Stops scheduling new cycles and waits for the in-flight cycle to finish. */
-  async stop(): Promise<void> {
-    if (!this.running) return;
-    this.running = false;
-    this.stopRequested = true;
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    if (this.currentCycle) {
-      await this.currentCycle;
-    }
-    this.deps.logger.info("Verification worker: stopped", { workerId: this.workerId });
-  }
-
-  private scheduleNext(delayMs: number): void {
-    if (!this.running) return;
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      void this.runCycle().finally(() => this.scheduleNext(this.deps.config.pollIntervalMs));
-    }, delayMs);
-  }
-
-  /**
-   * Claims and processes up to `batchSize` due events. Returns the number
-   * processed. Overlapping calls are rejected rather than run concurrently.
-   */
-  async runCycle(): Promise<number> {
-    if (this.currentCycle) {
-      this.deps.logger.warn("Verification worker: cycle skipped, previous cycle still running", {
-        workerId: this.workerId,
-      });
-      return 0;
-    }
-
-    this.currentCycle = this.drainBatch();
-    try {
-      return await this.currentCycle;
-    } finally {
-      this.currentCycle = null;
-    }
-  }
-
-  private async drainBatch(): Promise<number> {
-    let processed = 0;
-    while (processed < this.deps.config.batchSize) {
-      // Finish the event in hand on shutdown, but do not claim another.
-      if (this.stopRequested) break;
-
-      let event: IVerificationRequestEvent | null;
-      try {
-        event = await this.deps.events.claimNext({
-          workerId: this.workerId,
-          leaseMs: this.deps.config.leaseMs,
-          now: this.now(),
-        });
-      } catch (err) {
-        this.deps.logger.error("Verification worker: failed to claim event", {
-          workerId: this.workerId,
-          error: describeError(err),
-        });
-        break;
-      }
-      if (!event) break;
-
-      await this.processEvent(event);
-      processed += 1;
-    }
-    return processed;
-  }
-
-  /** Runs one event to completion, retry, or failure. Never throws. */
-  async processEvent(event: IVerificationRequestEvent): Promise<void> {
-    const ctx = { workerId: this.workerId, eventId: event.eventId, attempt: event.attempts };
-    let jobId = event.verificationJobId;
-
+/**
+ * Starts a scheduled scan of `pending` verification jobs that have an
+ * associated manifest, running the manifest re-hash check on each.
+ */
+export function startManifestRehashWorker(): void {
+  // Run every minute, alongside the existing timeout job.
+  cron.schedule("* * * * *", async () => {
     try {
       this.deps.logger.info("Verification worker: processing event", ctx);
       const outcome = await this.advance(event, (id) => {
@@ -350,9 +218,12 @@ export class VerificationWorker {
       const result = await this.verifyOnce(event, entry);
 
       if (!job) {
-        job = await jobs.createJob({ ownerPublicKey: event.requester, contentHash: result.contentHash });
-        // Ledger first: a crash before the event link still resolves to this job.
-        await ledger.attachJob(requestId, String(job._id));
+        job = await jobs.createJob({
+          ownerPublicKey: event.requester,
+          contentHash: result.contentHash,
+          manifestHash: result.manifestHash,
+          requestId: event.eventId,
+        });
         await events.attachJob(event._id, this.workerId, String(job._id));
       }
       const id = String(job._id);
@@ -407,6 +278,17 @@ export class VerificationWorker {
 
     // Stage 2: attestation transaction.
     if (job.status === VerificationStatus.TEE_VERIFYING) {
+      if (!job.codeMeasurementHash) {
+        throw new AppError(
+          "Cannot submit attestation without a TEE measurement hash",
+          409,
+          "MISSING_TEE_MEASUREMENT"
+        );
+      }
+      await this.deps.authorization?.assertAuthorized(
+        job.codeMeasurementHash,
+        this.deps.oracle.keypair.publicKey()
+      );
       const txHash = await this.submitAttestation(event, job, manifestHash);
       job = await jobs.updateJobStatus(id, {
         status: VerificationStatus.MINTING,
@@ -763,76 +645,23 @@ export const mongoRequestLedger: RequestLedger = {
 
 /** Builds a worker wired to the production services and configuration. */
 export function createVerificationWorker(): VerificationWorker {
+  const oracle = loadOracleConfig();
+  const queryClient = new SorobanContractQueryClient(oracle.keypair.publicKey());
+  const authorization = new RegistryAuthorizationService(
+    new RegistryContract(env.STELLAR_REGISTRY_CONTRACT_ID, queryClient),
+    new OracleContract(env.STELLAR_ORACLE_CONTRACT_ID, queryClient)
+  );
+
   return new VerificationWorker({
     events: verificationRequestEventService,
     jobs: verificationService,
     ledger: mongoRequestLedger,
     verifier: spvVerifierService,
     attestations: attestationService,
+    authorization,
     soroban: sorobanService,
-    oracle: loadOracleConfig(),
+    oracle,
     config: loadVerificationWorkerConfig(),
     logger,
-  });
-}
-
-export interface ShutdownOptions {
-  onStopped: () => Promise<void>;
-  exit: (code: number) => void;
-  forceExitAfterMs?: number;
-}
-
-/**
- * Installs SIGINT/SIGTERM handlers that stop the worker (letting the current
- * event finish), run `onStopped`, then exit. Returns an uninstaller.
- */
-export function installShutdownHandlers(
-  worker: VerificationWorker,
-  { onStopped, exit, forceExitAfterMs = 30_000 }: ShutdownOptions
-): () => void {
-  let shuttingDown = false;
-
-  const handler = (signal: NodeJS.Signals): void => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    logger.info("Verification worker: shutdown signal received", { signal, workerId: worker.id });
-
-    setTimeout(() => {
-      logger.error("Verification worker: forced exit after shutdown timeout", { workerId: worker.id });
-      exit(1);
-    }, forceExitAfterMs).unref();
-
-    void worker
-      .stop()
-      .then(onStopped)
-      .then(() => exit(0))
-      .catch((err: unknown) => {
-        logger.error("Verification worker: error during shutdown", { error: describeError(err) });
-        exit(1);
-      });
-  };
-
-  process.on("SIGINT", handler);
-  process.on("SIGTERM", handler);
-  return () => {
-    process.off("SIGINT", handler);
-    process.off("SIGTERM", handler);
-  };
-}
-
-async function main(): Promise<void> {
-  const worker = createVerificationWorker();
-  await connectDatabase();
-  installShutdownHandlers(worker, {
-    onStopped: disconnectDatabase,
-    exit: (code) => process.exit(code),
-  });
-  worker.start();
-}
-
-if (require.main === module) {
-  main().catch((err: unknown) => {
-    logger.error("Verification worker: fatal startup error", { error: describeError(err) });
-    process.exit(1);
   });
 }

@@ -2,6 +2,7 @@
  * Shared interfaces and types for storage orchestration
  * All storage-related types are defined here for consistency
  */
+import type { IpfsAvailability, IpfsPinStatus } from './ipfs.types';
 
 export type StorageProvider = 'cloudinary' | 'ipfs';
 
@@ -14,15 +15,13 @@ export interface UploadRequest {
   mimetype: string;
   originalname: string;
   userId: string;
-  kind?: StorageRecordKind;            // defaults to 'media'
-  assetId?: string;                    // Asset the stored object belongs to
-  metadata?: Record<string, string>;   // Provider metadata (IPFS pin key-values)
-  allowFallback?: boolean;             // IPFS -> Cloudinary fallback on failure (default true)
+  contentHash?: string;  // Verified SHA-256 hex; computed from the buffer when omitted
 }
 
 export interface UploadResult {
-  recordId?: string;     // StorageRecord _id (present once persisted)
-  provider: StorageProvider;
+  provider: StorageProvider;          // Provider that actually stored the file
+  requestedProvider: StorageProvider; // Provider the client asked for
+  fallbackUsed: boolean;              // True when the requested provider failed and a fallback stored the file
   url: string;
   cid?: string;          // IPFS only
   publicId?: string;     // Cloudinary only
@@ -31,9 +30,27 @@ export interface UploadResult {
   assetId?: string;
   size: number;
   mimetype: string;
+  contentHash?: string;  // SHA-256 hex of the stored bytes
   uploadedAt: Date;
   /** True when an existing record was reused instead of pinning the bytes again */
   deduplicated?: boolean;
+  /**
+   * IPFS only: public gateway URL for the pinned CID. Mirrors `url` for IPFS
+   * records so clients have an explicit, provider-named field. Absent for
+   * Cloudinary uploads.
+   */
+  gatewayUrl?: string;
+  /**
+   * IPFS only: Pinata pin state captured when the upload was accepted.
+   * `pinning` means the pin has not propagated yet, so clients should keep
+   * the upload in a pending state. Absent for Cloudinary uploads.
+   */
+  pinningStatus?: IpfsPinStatus;
+  /**
+   * IPFS only: gateway reachability for the CID, probed before responding.
+   * Absent for Cloudinary uploads.
+   */
+  availability?: IpfsAvailability;
 }
 
 /**
@@ -78,6 +95,29 @@ export interface CidResolutionResult {
 }
 
 /**
+ * Stored upload that already holds the same content hash
+ */
+export interface ExistingStorageRecord {
+  id: string;
+  provider: StorageProvider;
+  url: string;
+  cid?: string;
+  publicId?: string;
+  uploadedAt: Date;
+}
+
+/**
+ * Result of the pre-upload hash-consistency check
+ */
+export interface ContentHashCheckResult {
+  contentHash: string;
+  size: number;
+  matches: true;
+  alreadyStored: boolean;
+  existingRecords: ExistingStorageRecord[];
+}
+
+/**
  * Base interface for storage provider implementations
  */
 export interface IStorageProvider {
@@ -85,10 +125,11 @@ export interface IStorageProvider {
 }
 
 /**
- * Storage errors have provider context
+ * Storage errors have provider context.
+ * Extends AppError so the global error handler honours the status code
+ * instead of collapsing every storage failure into a generic 500.
  */
-export class StorageError extends Error {
-  statusCode: number;
+export class StorageError extends AppError {
   status: 'fail' | 'error';
 
   constructor(
@@ -97,9 +138,14 @@ export class StorageError extends Error {
     public reason: string,
     statusCode: number = 500,
   ) {
-    super(`Storage Error [${provider}/${operation}]: ${reason}`);
+    super(
+      `Storage Error [${provider}/${operation}]: ${reason}`,
+      statusCode,
+      `STORAGE_${operation.toUpperCase()}_FAILED`,
+    );
     this.name = 'StorageError';
-    this.statusCode = statusCode;
     this.status = statusCode < 500 ? 'fail' : 'error';
+    // AppError pins the prototype to AppError; restore it for `instanceof StorageError`.
+    Object.setPrototypeOf(this, StorageError.prototype);
   }
 }

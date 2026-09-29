@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mongoose model for VerificationJob documents.
  *
  * Schema design decisions:
@@ -8,6 +8,8 @@
  * - `status` is indexed: efficient filtering by lifecycle state.
  * - TEE and blockchain fields are optional at schema level; the service layer
  *   enforces their presence when the associated state transition occurs.
+ * - `timeline` is an append-only sub-document array recording every stage
+ *   transition; entries are never mutated or removed, only pushed.
  * - Timestamps are enabled via Mongoose options (adds `createdAt` / `updatedAt`).
  *
  * Also defines the worker's per-request bookkeeping, keyed by the request
@@ -21,11 +23,35 @@
  */
 import { Schema, model, Document, Types } from "mongoose";
 import { VerificationStatus } from "../types/verification.types";
-import type { IVerificationJob } from "../types/verification.types";
+import type { IVerificationJob, ITimelineEntry } from "../types/verification.types";
 
 export type VerificationJobDocument = IVerificationJob & Document;
 
 const ALL_STATUSES = Object.values(VerificationStatus);
+
+const TimelineEntrySchema = new Schema<ITimelineEntry>(
+  {
+    stage: {
+      type: String,
+      required: [true, "timeline entry stage is required"],
+      enum: {
+        values: ALL_STATUSES,
+        message: `timeline stage must be one of: ${ALL_STATUSES.join(", ")}`,
+      },
+    },
+    at: {
+      type: Date,
+      required: [true, "timeline entry timestamp is required"],
+      default: Date.now,
+    },
+    txHash: {
+      type: String,
+      trim: true,
+      default: undefined,
+    },
+  },
+  { _id: false }
+);
 
 const VerificationJobSchema = new Schema<VerificationJobDocument>(
   {
@@ -53,6 +79,18 @@ const VerificationJobSchema = new Schema<VerificationJobDocument>(
       trim: true,
       index: true,
     },
+    manifestHash: {
+      type: String,
+      trim: true,
+      index: true,
+      default: undefined,
+    },
+    requestId: {
+      type: String,
+      trim: true,
+      index: true,
+      default: undefined,
+    },
     status: {
       type: String,
       required: [true, "status is required"],
@@ -62,6 +100,12 @@ const VerificationJobSchema = new Schema<VerificationJobDocument>(
       },
       default: VerificationStatus.PENDING,
       index: true,
+    },
+
+    // Append-only stage history, oldest first.
+    timeline: {
+      type: [TimelineEntrySchema],
+      default: [],
     },
 
     // TEE attestation fields
@@ -85,6 +129,17 @@ const VerificationJobSchema = new Schema<VerificationJobDocument>(
     stellarTransactionHash: {
       type: String,
       trim: true,
+      default: undefined,
+    },
+    attestationTransactionHash: {
+      type: String,
+      trim: true,
+      default: undefined,
+    },
+    certificateId: {
+      type: String,
+      trim: true,
+      index: true,
       default: undefined,
     },
 

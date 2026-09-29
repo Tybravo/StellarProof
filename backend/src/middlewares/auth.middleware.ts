@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { authService } from '../services/auth.service';
 import { AppError } from '../errors/AppError';
+import type { IUser } from '../models/User.model';
 
 export const protect = async (
   req: Request,
@@ -73,3 +74,28 @@ export const protect = async (
     });
   }
 };
+
+/**
+ * Role guard. Must run after `protect`, which populates req.user.
+ */
+export const restrictTo =
+  (...roles: IUser['role'][]) =>
+  (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(new AppError('Authentication required', 401, 'AUTH_REQUIRED'));
+      return;
+    }
+
+    if (!roles.includes(req.user.role)) {
+      next(
+        new AppError(
+          'You do not have permission to perform this action',
+          403,
+          'FORBIDDEN'
+        )
+      );
+      return;
+    }
+
+    next();
+  };

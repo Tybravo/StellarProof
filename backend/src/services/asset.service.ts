@@ -2,8 +2,10 @@ import Asset, { IAsset } from "../models/Asset.model";
 import mongoose from "mongoose";
 import { StatusCodes } from "http-status-codes";
 import { AppError } from "../errors/AppError";
-import { isCidV1 } from "../utils/cid";
-import type { UploadResult } from "../types/storage.types";
+import { VerificationJobModel } from "../models/verificationJob.model";
+import type { AssetRequester, DeletedAssetResult } from "../types/asset.types";
+import type { PinReleaseOutcome } from "../types/ipfs.types";
+import { pinLifecycleService } from "./pinLifecycle.service";
 
 class AssetService {
   /**
@@ -33,54 +35,57 @@ class AssetService {
   }
 
   /**
-   * Links a completed storage upload to a new Asset.
-   *
-   * For IPFS uploads the canonical CIDv1 (mediaCid) is persisted as the
-   * Asset's storageReferenceId so on-chain registration and verification can
-   * reference it. The persisted document is re-read and returned so callers
-   * always respond with database state.
+   * Deletes an asset owned by the requester (or any asset, for admins).
+   * IPFS assets have their pin released first, unless another record still
+   * references the same CID. If Pinata fails, the asset is kept so the
+   * deletion can be retried and the pin is never leaked.
    */
-  async createFromUpload(params: {
-    creatorId: string;
-    fileName: string;
-    upload: UploadResult;
-  }): Promise<IAsset> {
-    const { creatorId, fileName, upload } = params;
-
-    let storageReferenceId: string;
-    if (upload.provider === "ipfs") {
-      if (!upload.cid || !isCidV1(upload.cid)) {
-        throw new AppError(
-          "IPFS upload did not produce a CIDv1 mediaCid",
-          StatusCodes.BAD_GATEWAY,
-          "IPFS_CID_VERSION_MISMATCH"
-        );
-      }
-      storageReferenceId = upload.cid;
-    } else {
-      storageReferenceId = upload.url;
+  async deleteAsset(id: string, requester: AssetRequester): Promise<DeletedAssetResult> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError("Invalid asset id", StatusCodes.BAD_REQUEST, "INVALID_ASSET_ID");
     }
 
-    const created = await this.createAsset({
-      creatorId,
-      fileName,
-      mimeType: upload.mimetype,
-      sizeBytes: upload.size,
-      storageProvider: upload.provider,
-      storageReferenceId,
-      isEncrypted: false,
-    });
+    const asset = await Asset.findById(id).exec();
+    if (!asset) {
+      throw new AppError("Asset not found", StatusCodes.NOT_FOUND, "ASSET_NOT_FOUND");
+    }
 
-    const persisted = await this.getAssetById(String(created._id));
-    if (!persisted) {
+    const isOwner = asset.creatorId.toString() === requester.id;
+    if (!isOwner && requester.role !== "admin") {
       throw new AppError(
-        "Failed to retrieve asset from database after creation",
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        "DB_RETRIEVAL_FAILED"
+        "You do not have permission to delete this asset",
+        StatusCodes.FORBIDDEN,
+        "FORBIDDEN"
       );
     }
 
-    return persisted;
+    const assetId = asset._id as mongoose.Types.ObjectId;
+    const linkedJob = await VerificationJobModel.exists({ assetId }).exec();
+    if (linkedJob) {
+      throw new AppError(
+        "Asset is referenced by a verification job and cannot be deleted",
+        StatusCodes.CONFLICT,
+        "ASSET_IN_USE"
+      );
+    }
+
+    let pinRelease: PinReleaseOutcome | undefined;
+    if (asset.storageProvider === "ipfs") {
+      pinRelease = await pinLifecycleService.releaseIfUnreferenced(asset.storageReferenceId, [
+        assetId,
+      ]);
+    }
+
+    await Asset.deleteOne({ _id: assetId }).exec();
+
+    return {
+      assetId: assetId.toString(),
+      fileName: asset.fileName,
+      storageProvider: asset.storageProvider,
+      storageReferenceId: asset.storageReferenceId,
+      deletedAt: new Date(),
+      ...(pinRelease ? { pinRelease } : {}),
+    };
   }
 }
 

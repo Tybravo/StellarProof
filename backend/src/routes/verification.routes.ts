@@ -158,4 +158,10 @@ router.post(
   verificationController.oracleCallback.bind(verificationController)
 );
 
+router.get(
+  "/:id/stream",
+  validateParams(jobIdParamsSchema),
+  verificationController.subscribe.bind(verificationController)
+);
+
 export default router;

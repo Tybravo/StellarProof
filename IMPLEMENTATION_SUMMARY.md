@@ -1,286 +1,400 @@
-# KMS Key Rotation - Implementation Summary
+# TEE Code-Measurement Hash Management - Implementation Summary
 
-## Overview
+## Issue
+**#716 [Backend] [Feature] Implement TEE code-measurement hash management for attestation**
 
-Successfully implemented the KMS (Key Management Service) key rotation feature for StellarProof, allowing users to rotate the keys protecting their SPV assets.
+## Objective
+Implement a system to compute, persist, and retrieve the trusted code measurement hash (SHA-256 of worker + enclave binary) used in TEE attestations, ensuring consistency and auditability.
 
-## What Was Implemented
+## Solution Overview
 
-### 1. Service Layer (`backend/src/services/kms.service.ts`)
+### Architecture Pattern
+**Strict Layered Architecture**: Model → Service → Controller → Routes
 
-**Core Business Logic:**
-
-- `rotateKey(userId)`: Main rotation function that:
-  - Generates a new key version (v1 → v2 → v3, etc.)
-  - Decrypts existing assets with old key
-  - Re-encrypts assets with new key
-  - Updates KMSKey document to new version
-  - Deactivates old key
-  - Uses MongoDB transactions for atomicity
-
-- `getActiveKey(userId)`: Retrieves the currently active key
-- `getAllKeys(userId)`: Retrieves all keys (active and inactive)
-
-**Security Features:**
-
-- AES-256-GCM encryption algorithm
-- Master key encryption for symmetric keys
-- Proper IV and authTag handling
-- Transaction-based operations for data consistency
-
-### 2. Controller Layer (`backend/src/controllers/kms.controller.ts`)
-
-**HTTP Request Handlers:**
-
-- `rotateKey`: POST endpoint handler with validation
-- `getUserKeys`: GET endpoint to retrieve all keys
-- `getActiveKey`: GET endpoint for active key
-
-**Features:**
-
-- Input validation (userId format, required fields)
-- Proper HTTP status codes (200, 400, 404, 500)
-- Structured error responses
-- Environment-aware error messages
-
-### 3. Routes Layer (`backend/src/routes/kms.routes.ts`)
-
-**Versioned API Endpoints:**
-
-- `POST /api/v1/kms/rotate` - Rotate key
-- `GET /api/v1/kms/keys/:userId` - Get all keys
-- `GET /api/v1/kms/keys/:userId/active` - Get active key
-
-### 4. Model Updates (`backend/src/models/KMSKey.model.ts`)
-
-**Enhanced KMSKey Model:**
-
-- Added `authTag` field for GCM authentication
-- Updated interface and schema
-- Maintains backward compatibility
-
-### 5. Testing Utilities
-
-**Seed Script (`backend/src/utils/seedKMSData.ts`):**
-
-- Creates test user
-- Generates initial KMS key (v1)
-- Creates 5 sample encrypted assets
-- Provides test userId for API testing
-
-**Testing Documentation (`backend/TESTING_KMS.md`):**
-
-- Complete setup instructions
-- Postman/cURL examples
-- Expected responses
-- Error testing scenarios
-- Verification checklist
-
-### 6. Documentation
-
-**Service Documentation (`backend/src/services/README.md`):**
-
-- API endpoint specifications
-- Request/response examples
-- Security considerations
-- Implementation details
-- Future enhancements
-
-### 7. Configuration Updates
-
-**Environment Variables (`backend/.env.example`):**
-
-- Added `MASTER_KEY` configuration
-- Security notes and best practices
-
-**Package Scripts (`backend/package.json`):**
-
-- Added `seed:kms` script for easy testing
-
-**Server Integration (`backend/src/index.ts`):**
-
-- Registered KMS routes with versioned prefix
-
-## Architecture Compliance
-
-✅ **Strict Layered Architecture:**
-
-- Controller → Service → Model pattern implemented
-- Controllers handle HTTP only
-- Services contain business logic
-- Models define data structure
-
-✅ **API Versioning:**
-
-- All endpoints use `/api/v1/` prefix
-
-✅ **Production Ready:**
-
-- Robust error handling
-- Strong TypeScript typing (no `any` types)
-- Transaction safety
-- Input validation
-- Proper status codes
-
-✅ **Database Integration:**
-
-- Real MongoDB operations
-- No inline mocks or hardcoded values
-- Transaction support for atomicity
-
-## Technical Highlights
-
-### Transaction Safety
-
-```typescript
-const session = await mongoose.startSession();
-session.startTransaction();
-try {
-  // All operations
-  await session.commitTransaction();
-} catch (error) {
-  await session.abortTransaction();
-  throw error;
-}
+```
+Request
+  ↓
+Routes (teeConfig.routes.ts) - Validation & Routing
+  ↓
+Controller (teeConfig.controller.ts) - Request/Response Handling
+  ↓
+Service (teeConfig.service.ts) - Business Logic
+  ↓
+Model (TEEConfig.model.ts) - Database Schema & Persistence
+  ↓
+MongoDB - Data Storage
 ```
 
-### Encryption Flow
+## Files Created
 
-1. Generate 256-bit symmetric key
-2. Encrypt with master key using AES-256-GCM
-3. Store encrypted key + IV + authTag
-4. Use for asset encryption/decryption
+### 1. Model: `backend/src/models/TEEConfig.model.ts`
+**Purpose**: Define MongoDB schema for TEE configurations
 
-### Key Rotation Flow
+**Key Components**:
+- **ITEEConfig Interface**: TypeScript interface extending Mongoose Document
+- **Fields**:
+  - `name`: String, unique, required - Configuration identifier
+  - `codeMeasurementHash`: String, SHA-256 format (64 hex chars), unique, indexed
+  - `workerBinaryHash`: String, optional - SHA-256 of worker binary
+  - `enclaveBinaryHash`: String, optional - SHA-256 of enclave binary
+  - `version`: String - Configuration version
+  - `environment`: Enum ['testnet', 'mainnet', 'development'] - Deployment target
+  - `isActive`: Boolean - Active status flag
+  - `isDeprecated`: Boolean - Deprecation status
+  - `createdBy`: ObjectId reference to User
+  - `activatedAt`, `deprecatedAt`: Audit timestamps
+  - `createdAt`, `updatedAt`: Mongoose timestamps
 
-1. Find active key (v1)
-2. Increment version (v2)
-3. Decrypt old key with master key
-4. Generate new symmetric key
-5. Encrypt new key with master key
-6. Update all assets to v2
-7. Deactivate v1
-8. Save v2 as active
+**Validation**:
+- SHA-256 hash format validation via regex: `/^[a-f0-9]{64}$/i`
+- Pre-save hook ensures:
+  - Cannot be both active AND deprecated
+  - Auto-sets `activatedAt` when marked active
+  - Auto-sets `deprecatedAt` when marked deprecated
 
-## Files Created/Modified
+**Indexes**:
+- `codeMeasurementHash` (unique) - Fast hash lookups
+- `name` (unique) - Prevent duplicate names
+- `environment` - Environment filtering
+- Compound: `{ environment: 1, isActive: 1 }` - Active config by environment
+- Compound: `{ environment: 1, isDeprecated: 1 }` - Deprecated config queries
 
-### New Files (7):
+### 2. Service: `backend/src/services/teeConfig.service.ts`
+**Purpose**: Encapsulate all business logic for TEE configuration management
 
-1. `backend/src/services/kms.service.ts` - Core business logic
-2. `backend/src/controllers/kms.controller.ts` - HTTP handlers
-3. `backend/src/routes/kms.routes.ts` - API routes
-4. `backend/src/utils/seedKMSData.ts` - Test data seeder
-5. `backend/src/services/README.md` - Service documentation
-6. `backend/TESTING_KMS.md` - Testing guide
-7. `IMPLEMENTATION_SUMMARY.md` - This file
+**TEEConfigService Class Methods**:
 
-### Modified Files (4):
+#### Creation & Hashing
+- `computeCodeMeasurementHash(workerBinary: Buffer, enclaveBinary: Buffer): string`
+  - Concatenates worker + enclave binaries
+  - Returns SHA-256 hash as hex string
+  
+- `computeBinaryHash(binary: Buffer): string`
+  - Returns SHA-256 hash of single binary
 
-1. `backend/src/models/KMSKey.model.ts` - Added authTag field
-2. `backend/src/index.ts` - Registered KMS routes
-3. `backend/.env.example` - Added MASTER_KEY
-4. `backend/package.json` - Added seed:kms script
+- `createTEEConfig(input: CreateTEEConfigInput): Promise<TEEConfigResponse>`
+  - Validates all input fields
+  - Checks for duplicate hashes and names
+  - Computes hashes if binaries provided
+  - Creates and persists MongoDB document
+  - Returns formatted response
 
-## Testing Instructions
+#### Retrieval
+- `getActiveTEEConfig(environment): Promise<TEEConfigResponse | null>`
+  - Retrieves active, non-deprecated config for environment
+  - Sorted by most recent update
+  - **Used by attestation service for database-backed hashes**
 
-### Quick Start:
+- `getTEEConfigById(id: string): Promise<TEEConfigResponse | null>`
+  - Direct ID lookup
 
-```bash
-# 1. Setup environment
-cd backend
-cp .env.example .env
-# Edit .env with your MONGODB_URI and MASTER_KEY
+- `getTEEConfigByHash(codeMeasurementHash): Promise<TEEConfigResponse | null>`
+  - Lookup by code measurement hash
+  - Used to verify configuration authenticity
 
-# 2. Install dependencies
-pnpm install
+- `listTEEConfigs(filters?): Promise<TEEConfigResponse[]>`
+  - Optional filtering by environment, isActive, isDeprecated
+  - Returns sorted list
 
-# 3. Seed test data
-pnpm seed:kms
-# Save the userId from output
+#### Updates & Lifecycle
+- `updateTEEConfig(id, input): Promise<TEEConfigResponse>`
+  - Updates: description, version, isActive, isDeprecated
 
-# 4. Start server
-pnpm dev
+- `deprecateTEEConfig(id): Promise<TEEConfigResponse>`
+  - Marks config as deprecated and inactive
+  - Sets deprecatedAt timestamp
 
-# 5. Test with Postman
-POST http://localhost:4000/api/v1/kms/rotate
-Body: { "userId": "your-test-user-id" }
-```
+- `deleteTEEConfig(id): Promise<void>`
+  - Only deletes if not active
+  - Prevents accidental deletion of in-use configs
 
-### Expected Result:
+#### Response Formatting
+- `formatTEEConfigResponse(config): TEEConfigResponse`
+  - Converts Mongoose document to API response DTO
+  - Ensures consistent response format
 
+**Error Handling**:
+- Throws `AppError` with appropriate HTTP status codes
+- Validation errors: 400 Bad Request
+- Duplicates: 409 Conflict
+- Not found: 404 Not Found
+- Constraint violations: 400 Bad Request
+
+### 3. Controller: `backend/src/controllers/teeConfig.controller.ts`
+**Purpose**: Handle HTTP requests and responses
+
+**Exported Functions** (7 endpoints):
+1. `createTEEConfig()` - POST /api/v1/tee-config/create
+2. `getActiveTEEConfig()` - GET /api/v1/tee-config/active/:environment
+3. `getTEEConfigById()` - GET /api/v1/tee-config/:id
+4. `getTEEConfigByHash()` - GET /api/v1/tee-config/hash/:codeMeasurementHash
+5. `listTEEConfigs()` - GET /api/v1/tee-config
+6. `updateTEEConfig()` - PATCH /api/v1/tee-config/:id
+7. `deprecateTEEConfig()` - POST /api/v1/tee-config/:id/deprecate
+8. `deleteTEEConfig()` - DELETE /api/v1/tee-config/:id
+9. `computeCodeMeasurementHash()` - POST /api/v1/tee-config/compute-hash
+
+**Pattern**:
+- Extract and validate input from `req.body`, `req.params`, `req.query`
+- Call service method
+- Return standardized JSON responses
+- Pass errors to `next()` for global error handler
+
+**Response Format**:
 ```json
 {
-  "status": "success",
-  "message": "Key rotation completed successfully",
-  "data": {
-    "oldKeyVersion": "v1",
-    "newKeyVersion": "v2",
-    "assetsReEncrypted": 5,
-    "timestamp": "2024-01-15T10:30:00.000Z"
-  }
+  "success": true/false,
+  "message": "Human readable message",
+  "data": { /* response object */ }
 }
 ```
 
-## Security Considerations
+### 4. Routes: `backend/src/routes/teeConfig.routes.ts`
+**Purpose**: Define API endpoints and validation
 
-1. **Master Key Protection:**
-   - Stored in environment variable
-   - Should use secrets manager in production
-   - Never committed to version control
+**Route Configuration**:
+- Base path: `/api/v1/tee-config`
+- Validation schemas using Zod library
+- Public routes (no auth required):
+  - `POST /create` - Create config
+  - `GET /active/:environment` - Get active by environment
+  - `GET /hash/:codeMeasurementHash` - Get by hash
+  - `GET /` - List all
+  - `GET /:id` - Get by ID
+  - `POST /compute-hash` - Hash computation utility
 
-2. **Encryption:**
-   - AES-256-GCM provides confidentiality + authenticity
-   - Unique IV for each encryption
-   - AuthTag verification prevents tampering
+- Protected routes (JWT required):
+  - `PATCH /:id` - Update config
+  - `POST /:id/deprecate` - Deprecate config
+  - `DELETE /:id` - Delete config
 
-3. **Transaction Safety:**
-   - All-or-nothing operations
-   - Prevents partial updates
-   - Maintains data consistency
+**Validation Schemas**:
+- `createTEEConfigSchema` - Validates all create fields
+- `updateTEEConfigSchema` - Validates update fields
+- `computeHashSchema` - Validates binary base64 inputs
 
-4. **Input Validation:**
-   - ObjectId format validation
-   - Required field checks
-   - Proper error messages
+### 5. Integration: `backend/src/routes/index.ts`
+**Changes**:
+- Added import: `import teeConfigRoutes from "./teeConfig.routes";`
+- Added route mount: `router.use("/api/v1/tee-config", teeConfigRoutes);`
+
+### 6. Attestation Service Update: `backend/src/services/attestation.service.ts`
+**Purpose**: Integrate database-backed hash retrieval
+
+**New Methods**:
+- `createAttestationWithTEEConfig(input, keypair, environment)`
+  - **Database-backed**: Retrieves active TEE config from database
+  - Looks up by environment
+  - Uses persisted `codeMeasurementHash`
+  - Creates attestation with retrieved hash
+  - **Primary method for production use**
+
+- `createAttestationWithHash(input, keypair, codeMeasurementHash)`
+  - Creates attestation with explicit hash
+  - Supports both database-backed and direct hash usage
+
+- `createAttestation()` (legacy)
+  - Maintained for backward compatibility
+  - Delegates to `createAttestationWithHash()`
+
+**Impact**:
+- Attestations now use database-persisted hashes
+- Consistent and auditable hash management
+- Supports environment-specific configurations
+
+## Key Features
+
+### 1. Persistence
+- All TEE configurations persisted in MongoDB
+- No inline mock objects or hardcoded values
+- Unique hash constraint prevents duplicates
+- Compound indexes for efficient queries
+
+### 2. Data Validation
+- SHA-256 format validation (64 hex characters)
+- Environment enum validation
+- Duplicate detection for hashes and names
+- Business rule validation (cannot be active + deprecated)
+
+### 3. Audit Trail
+- `createdBy` - Tracks creator
+- `createdAt`, `updatedAt` - Timestamps
+- `activatedAt` - When config was activated
+- `deprecatedAt` - When config was deprecated
+- Status fields: `isActive`, `isDeprecated`
+
+### 4. Environment Management
+- Separate configurations per environment (testnet, mainnet, development)
+- Active configuration per environment
+- Query support for environment filtering
+- Attestation service retrieves environment-specific hash
+
+### 5. Lifecycle Management
+- Create configurations
+- Mark as active/inactive
+- Deprecate without deleting
+- Delete only inactive configs
+- Update metadata
+
+### 6. Error Handling
+- Comprehensive error messages
+- Appropriate HTTP status codes
+- Custom error codes for programmatic handling
+- Global error handler integration
+
+## TypeScript & Code Quality
+
+### Strong Typing
+- Full TypeScript interfaces for all entities
+- No `any` types
+- Strict null checks
+- Type-safe service methods
+
+### Production-Ready Patterns
+- Service layer separation
+- Middleware validation
+- Error handling pipeline
+- Consistent response format
+
+### Code Organization
+- Clear separation of concerns
+- Single responsibility per file
+- Reusable validation schemas
+- Documented functions and exports
+
+## Database Schema
+
+### MongoDB Collection: `teeconfigs`
+
+```javascript
+{
+  _id: ObjectId,
+  name: String (unique, indexed),
+  description: String,
+  codeMeasurementHash: String (unique, indexed, regex validated),
+  workerBinaryHash: String (regex validated),
+  enclaveBinaryHash: String (regex validated),
+  version: String,
+  environment: String (enum: testnet|mainnet|development, indexed),
+  isActive: Boolean (indexed),
+  isDeprecated: Boolean (indexed),
+  createdBy: ObjectId (reference to User),
+  activatedAt: Date,
+  deprecatedAt: Date,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+**Indexes**:
+1. `name` (unique)
+2. `codeMeasurementHash` (unique)
+3. `environment`
+4. `isActive`
+5. `isDeprecated`
+6. Compound: `{ environment: 1, isActive: 1 }`
+7. Compound: `{ environment: 1, isDeprecated: 1 }`
+
+## API Endpoints Summary
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/v1/tee-config/create` | No | Create TEE config |
+| GET | `/api/v1/tee-config/active/:env` | No | Get active config by environment |
+| GET | `/api/v1/tee-config/:id` | No | Get config by ID |
+| GET | `/api/v1/tee-config/hash/:hash` | No | Get config by code measurement hash |
+| GET | `/api/v1/tee-config` | No | List all configs (with optional filters) |
+| POST | `/api/v1/tee-config/compute-hash` | No | Compute hash utility |
+| PATCH | `/api/v1/tee-config/:id` | Yes | Update config |
+| POST | `/api/v1/tee-config/:id/deprecate` | Yes | Deprecate config |
+| DELETE | `/api/v1/tee-config/:id` | Yes | Delete config |
+
+## Compliance
+
+### Acceptance Criteria ✓
+- [x] **Strict Layered Architecture**: Controller → Service → Model pattern
+- [x] **Data Source**: All data from MongoDB (no mock objects)
+- [x] **Environment**: Uses .env configuration
+- [x] **API Versioning**: All endpoints at `/api/v1/...`
+- [x] **Production Ready**: Error handling, strong typing, validation
+- [x] **Proof of Work**: Test guide provided (see TEE_CONFIG_TEST_GUIDE.md)
+
+### CONTRIBUTING.md Compliance
+- [x] Proper folder structure (models, services, controllers, routes)
+- [x] Controller → Service → Model separation
+- [x] TypeScript with strict mode
+- [x] No inline mock objects or hardcoded values
+- [x] Standard HTTP status codes
+- [x] Robust error handling
+- [x] Environment variables for configuration
+- [x] Comprehensive documentation
+
+## Testing & Verification
+
+See `TEE_CONFIG_TEST_GUIDE.md` for:
+- Detailed test scenarios
+- Postman/curl examples
+- Database verification steps
+- Error handling verification
+- Screenshots of successful responses
+
+## PR Requirements
+
+**Title**: `[Backend] Implement TEE code-measurement hash management for attestation`
+
+**Description**:
+```
+Closes #716
+
+## Summary
+Implemented TEE code-measurement hash management system for trusted attestations.
+
+## Changes
+- Added TEEConfig MongoDB model for persisting trusted hashes
+- Created TEEConfigService for CRUD operations and hash computation
+- Implemented 9 API endpoints for TEE config management
+- Updated AttestationService to retrieve persisted hashes from database
+- Added comprehensive validation and error handling
+- Integrated with environment-specific configurations
+
+## Database
+- New collection: `teeconfigs`
+- Unique indexes on hash and name
+- Compound indexes for environment-based queries
+
+## API
+- Base path: `/api/v1/tee-config`
+- 6 public endpoints + 3 protected endpoints
+- Full CRUD support with deprecation lifecycle
+
+## Testing
+Follow scenarios in TEE_CONFIG_TEST_GUIDE.md
+[Include Postman screenshots of successful operations]
+[Include MongoDB collection screenshot]
+
+## Architecture
+- Strict layered: Routes → Controller → Service → Model
+- No hardcoded values or mock objects
+- Database-backed hash retrieval for attestations
+- Production-ready error handling and validation
+```
 
 ## Future Enhancements
 
-- [ ] Implement actual asset data re-encryption (currently metadata only)
-- [ ] Add scheduled key rotation
-- [ ] Implement key expiration policies
-- [ ] Add audit logging
-- [ ] Support multiple encryption algorithms
-- [ ] Integration with AWS KMS/Azure Key Vault
-- [ ] Add unit and integration tests
-- [ ] Add authentication middleware
-- [ ] Implement rate limiting
+1. **Binary Upload**: Support uploading actual worker/enclave binaries
+2. **Hash Signing**: Sign code measurement hashes with admin key
+3. **Versioning**: Track multiple versions of TEE binaries
+4. **Attestation Validation**: Service to validate incoming attestations against stored configs
+5. **Audit Logs**: Detailed logging of config changes
+6. **Rate Limiting**: Per-config rate limits for sensitive operations
 
-## Compliance Checklist
+## Conclusion
 
-✅ Controller -> Service -> Model pattern
-✅ Data from database (no mocks)
-✅ Environment variables for configuration
-✅ API versioning (/api/v1/...)
-✅ Production-ready code quality
-✅ Robust error handling
-✅ Strong TypeScript typing
-✅ Transaction safety
-✅ Comprehensive documentation
-✅ Testing utilities provided
-
-## Next Steps for PR
-
-1. Test the implementation using the testing guide
-2. Take screenshots of successful API responses
-3. Create PR with:
-   - "Closes #[issue_id]" in description
-   - Summary of work done
-   - Screenshots of proof of work
-   - Reference to TESTING_KMS.md for reviewers
-
-## Notes
-
-- No AI agent was used to submit the PR (manual submission required)
-- All code follows CONTRIBUTING.md guidelines
-- Ready for code review and testing
-- Documentation provided for maintainers and future contributors
+This implementation provides:
+- ✅ Secure persistence of TEE code measurement hashes
+- ✅ Production-ready API with validation and error handling
+- ✅ Environment-aware configuration management
+- ✅ Audit trail for compliance and debugging
+- ✅ Database-backed attestation service
+- ✅ Full TypeScript type safety
+- ✅ Comprehensive documentation and testing guide

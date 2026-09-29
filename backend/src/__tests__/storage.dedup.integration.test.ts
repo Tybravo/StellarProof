@@ -91,10 +91,14 @@ beforeEach(async () => {
     const cid = cidFor(bytes);
     return {
       cid,
+      cidVersion: 1 as const,
       size: bytes.length,
       name: input.name ?? 'upload',
       timestamp: new Date().toISOString(),
       gatewayUrl: `https://gateway.example/ipfs/${cid}`,
+      pinId: `pin-${cid}`,
+      pinningStatus: 'pinned' as const,
+      availability: { available: true, httpStatus: 200, checkedAt: new Date().toISOString() },
     };
   });
 });

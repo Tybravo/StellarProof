@@ -56,3 +56,48 @@ export interface RpcNetworkStatus {
     occurredAt: Date;
   }>;
 }
+
+// ---------------------------------------------------------------------------
+// Transaction submission and confirmation types
+// ---------------------------------------------------------------------------
+
+/**
+ * Diagnostics returned when a transaction fails on-chain or is rejected
+ * before reaching a ledger.
+ */
+export interface TransactionFailureDiagnostics {
+  /** Hex transaction hash. */
+  txHash: string;
+  /** Top-level Stellar result code string, e.g. `tx_failed`. */
+  resultCode: string;
+  /** Per-operation result code strings (non-empty for tx_failed). */
+  operationResultCodes: string[];
+  /** Raw diagnostic event XDR strings from the RPC response. */
+  diagnosticEventsXdr: string[];
+  /**
+   * Ledger at which the transaction failed. `undefined` means the failure
+   * occurred before the transaction reached a ledger (e.g. submission error)
+   * and the transaction cannot have taken effect.
+   */
+  ledger?: number;
+}
+
+/**
+ * Returned by `SorobanService.getTransactionWithConfirmation` when the
+ * transaction has been included and applied on-chain with a SUCCESS outcome.
+ */
+export interface SuccessfulTransactionStatus {
+  status: 'SUCCESS';
+  /** Hex transaction hash (same as the hash submitted). */
+  txHash: string;
+  /** Ledger sequence number at which the transaction was included. */
+  ledger: number;
+  /** Unix timestamp (seconds) of the ledger close time. */
+  createdAt: number;
+  /**
+   * The return value of the invoked contract function, serialised as an
+   * `xdr.ScVal`. Present for `invoke_host_function` operations; absent for
+   * transactions that do not return a value.
+   */
+  returnValue?: import('@stellar/stellar-sdk').xdr.ScVal;
+}

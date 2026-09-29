@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Domain types for the Verification Job state machine.
  * Shared across all layers: models, services, controllers, and routes.
  */
@@ -11,7 +11,7 @@
  * All valid lifecycle states a VerificationJob can occupy.
  *
  * State flow (happy path):
- *   pending → processing → tee_verifying → minting → completed
+ *   pending -> processing -> tee_verifying -> minting -> completed
  *
  * Terminal states: completed | failed
  * Any job that reaches a terminal state CANNOT be transitioned further.
@@ -30,15 +30,13 @@ export enum VerificationStatus {
 // ---------------------------------------------------------------------------
 
 /**
- * Defines every legal "from → to" transition.
+ * Defines every legal "from -> to" transition.
  * Keyed by current status; value is the set of statuses it may move to.
  *
- * Terminal states (completed, failed) map to an empty set –
+ * Terminal states (completed, failed) map to an empty set -
  * no further transitions are permitted from them.
  */
-export const VALID_TRANSITIONS: Readonly<
-  Record<VerificationStatus, ReadonlySet<VerificationStatus>>
-> = {
+export const VALID_TRANSITIONS: Readonly<Record<VerificationStatus, ReadonlySet<VerificationStatus>>> = {
   [VerificationStatus.PENDING]: new Set([
     VerificationStatus.PROCESSING,
     VerificationStatus.FAILED,
@@ -60,6 +58,24 @@ export const VALID_TRANSITIONS: Readonly<
 } as const;
 
 // ---------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------
+
+/**
+ * A single append-only timeline event, recorded every time a job enters
+ * a new lifecycle stage. Powers the frontend progress stepper
+ * (Requested -> SPV Processing -> Attested -> Minted).
+ */
+export interface ITimelineEntry {
+  /** The stage the job entered. */
+  stage: VerificationStatus;
+  /** When the job entered this stage. */
+  at: Date;
+  /** Stellar transaction hash, present only for on-chain stages (e.g. minting). */
+  txHash?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Interfaces
 // ---------------------------------------------------------------------------
 
@@ -79,8 +95,15 @@ export interface IVerificationJob {
   /** SHA-256 hex digest of the content being verified. */
   contentHash: string;
 
+  /** Correlation identifiers emitted by the Oracle and Provenance contracts. */
+  manifestHash?: string;
+  requestId?: string;
+
   /** Current lifecycle state of the job. */
   status: VerificationStatus;
+
+  /** Append-only history of every stage this job has passed through. */
+  timeline: ITimelineEntry[];
 
   // -- TEE attestation data (populated during tee_verifying step) -----------
 
@@ -97,6 +120,10 @@ export interface IVerificationJob {
 
   /** Stellar/Soroban transaction hash for the on-chain certificate mint. */
   stellarTransactionHash?: string;
+  /** Transaction that emitted the accepted attestation event. */
+  attestationTransactionHash?: string;
+  /** Certificate identifier returned by the Provenance contract. */
+  certificateId?: string;
 
   // -- Failure data ---------------------------------------------------------
 
@@ -118,6 +145,8 @@ export interface IVerificationJob {
 export interface CreateVerificationJobDTO {
   ownerPublicKey: string;
   contentHash: string;
+  manifestHash?: string;
+  requestId?: string;
   webhookUrl?: string;
 }
 
@@ -126,13 +155,13 @@ export interface UpdateVerificationStatusDTO {
   status: VerificationStatus;
   /** Required when transitioning to `failed`. */
   errorMessage?: string;
-  /** TEE attestation hash – supplied when entering `tee_verifying`. */
+  /** TEE attestation hash - supplied when entering `tee_verifying`. */
   teeAttestationHash?: string;
-  /** TEE oracle signature – supplied when entering `tee_verifying`. */
+  /** TEE oracle signature - supplied when entering `tee_verifying`. */
   teeSignature?: string;
-  /** Trusted TEE code measurement hash – supplied when entering `tee_verifying`. */
+  /** Trusted TEE code measurement hash - supplied when entering `tee_verifying`. */
   codeMeasurementHash?: string;
-  /** Stellar transaction hash – supplied when entering `minting` or `completed`. */
+  /** Stellar transaction hash - supplied when entering `minting` or `completed`. */
   stellarTransactionHash?: string;
 }
 /** Standard JSON envelope returned by every endpoint. */
@@ -149,4 +178,22 @@ export interface OracleCallbackDTO {
   jobId: string; // MongoDB ObjectId of the VerificationJob
   teeAttestationHash: string; // SHA-256 hex digest
   teeSignature: string; // Oracle signature (hex/base64 string)
+}
+
+// ---------------------------------------------------------------------------
+// SSE Types
+// ---------------------------------------------------------------------------
+
+/** Status event payload sent to SSE subscribers. */
+export interface StatusEventPayload {
+  jobId: string;
+  status: VerificationStatus;
+  ownerPublicKey: string;
+  contentHash: string;
+  teeAttestationHash: string | null;
+  stellarTransactionHash: string | null;
+  errorMessage: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  [key: string]: unknown;
 }

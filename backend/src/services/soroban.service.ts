@@ -1,6 +1,7 @@
-import {
+﻿import {
   Account,
   FeeBumpTransaction,
+  Keypair,
   StrKey,
   Transaction,
   rpc,
@@ -93,7 +94,7 @@ export function defaultSorobanConfig(): SorobanServiceConfig {
   return {
     rpcUrl: env.STELLAR_RPC_URL,
     networkPassphrase: env.STELLAR_NETWORK_PASSPHRASE,
-    timeoutMs: env.STELLAR_RPC_TIMEOUT_MS,
+    timeoutMs: (env.STELLAR_RPC_TIMEOUT_MS != null && Number.isFinite(env.STELLAR_RPC_TIMEOUT_MS as number)) ? (env.STELLAR_RPC_TIMEOUT_MS as number) : 30_000,
     // Plain-http RPC (local quickstart node) is never allowed in production
     allowHttp: env.NODE_ENV !== "production" && env.STELLAR_RPC_URL.startsWith("http://"),
   };
@@ -227,6 +228,158 @@ export class SorobanService {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Oracle-facing contract interaction methods
+  // -------------------------------------------------------------------------
+
+  /**
+   * Builds, simulates, and signs a `provenance.mint` transaction.
+   * The transaction is ready to be submitted but has NOT been sent yet.
+   *
+   * @throws TransactionSimulationError when the simulation rejects the call
+   *   (e.g. a certificate already exists for this content).
+   */
+  async buildMintTransaction(
+    keypair: Keypair,
+    contractId: string,
+    mintArgs: import("../utils/xdr").MintArgs
+  ): Promise<import("../utils/transactionBuilder").SignedContractTransaction> {
+    const { buildSignedContractTransaction } = await import("../utils/transactionBuilder");
+    const { buildMintArgs } = await import("../utils/xdr");
+    return buildSignedContractTransaction({
+      client: this.server,
+      keypair,
+      networkPassphrase: this.networkPassphrase,
+      call: {
+        contractId,
+        method: "mint",
+        args: buildMintArgs(mintArgs),
+      },
+    });
+  }
+
+  /**
+   * Submits a signed transaction to the Soroban RPC. Returns when the RPC
+   * has accepted the submission (PENDING or DUPLICATE).
+   *
+   * @throws TransactionFailedError  when the RPC immediately rejects it.
+   * @throws TransactionSubmissionError when the RPC asks for a retry later.
+   */
+  async submitTransaction(
+    signed: import("../utils/transactionBuilder").SignedContractTransaction
+  ): Promise<void> {
+    const {
+      TransactionFailedError: TxFailed,
+      TransactionSubmissionError: TxSubmission,
+    } = await import("../errors/SorobanTransactionError");
+
+    const response = await this.call(
+      "sendTransaction",
+      () => this.server.sendTransaction(signed.transaction)
+    );
+
+    if (response.status === "TRY_AGAIN_LATER") {
+      throw new TxSubmission(
+        `Transaction ${signed.hash} deferred: RPC is congested`,
+        signed.hash
+      );
+    }
+
+    if (response.status === "ERROR") {
+      const result = response.errorResult?.result();
+      const resultCode = result?.switch().name ?? "unknown";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const operationResultCodes: string[] = (result?.results() as any[])
+        ?.map((r: any) => r.tr?.()?.switch?.().name ?? "unknown") ?? [];
+      throw new TxFailed({
+        txHash: signed.hash,
+        resultCode,
+        operationResultCodes,
+        diagnosticEventsXdr: [],
+      });
+    }
+    // PENDING or DUPLICATE — submission accepted
+  }
+
+  /**
+   * Polls `getTransaction` until the transaction reaches a final state.
+   *
+   * Resolves with a `SuccessfulTransactionStatus` when the transaction is
+   * confirmed `SUCCESS`.
+   *
+   * @throws TransactionFailedError              when the transaction failed on-chain.
+   * @throws TransactionConfirmationTimeoutError when the window expires.
+   * @throws SorobanRpcError                     on persistent RPC failures.
+   */
+  async getTransactionWithConfirmation(
+    txHash: string
+  ): Promise<import("../types/soroban.types").SuccessfulTransactionStatus> {
+    const {
+      TransactionFailedError: TxFailed,
+      TransactionConfirmationTimeoutError: TxTimeout,
+      SorobanRpcError: RpcErr,
+    } = await import("../errors/SorobanTransactionError");
+
+    const timeoutMs = env.STELLAR_TX_CONFIRMATION_TIMEOUT_MS;
+    const pollIntervalMs = env.STELLAR_TX_POLL_INTERVAL_MS;
+    const maxConsecutiveRpcErrors = env.STELLAR_TX_MAX_CONSECUTIVE_RPC_ERRORS;
+
+    const deadline = Date.now() + timeoutMs;
+    let consecutiveRpcErrors = 0;
+    let attempts = 0;
+
+    while (Date.now() < deadline) {
+      attempts += 1;
+      let response: rpc.Api.GetTransactionResponse;
+      try {
+        response = await this.call("getTransaction", () => this.server.getTransaction(txHash));
+        consecutiveRpcErrors = 0;
+      } catch (err) {
+        consecutiveRpcErrors += 1;
+        if (consecutiveRpcErrors >= maxConsecutiveRpcErrors) {
+          throw new RpcErr(
+            `getTransaction failed ${consecutiveRpcErrors} times in a row: ${err instanceof Error ? err.message : String(err)}`,
+            txHash
+          );
+        }
+        await new Promise((r) => setTimeout(r, pollIntervalMs));
+        continue;
+      }
+
+      if (response.status === "SUCCESS") {
+        const txMeta = response.resultMetaXdr;
+        let returnValue: import("@stellar/stellar-sdk").xdr.ScVal | undefined;
+        try {
+          const sorobanMeta = txMeta.v3?.().sorobanMeta?.()?.returnValue?.();
+          if (sorobanMeta) returnValue = sorobanMeta;
+        } catch {
+          // returnValue stays undefined; that is fine for non-invocation txs
+        }
+        return {
+          status: "SUCCESS",
+          txHash,
+          ledger: response.ledger,
+          createdAt: response.createdAt,
+          returnValue,
+        };
+      }
+
+      if (response.status === "FAILED") {
+        throw new TxFailed({
+          txHash,
+          resultCode: "failed",
+          operationResultCodes: [],
+          diagnosticEventsXdr: [],
+          ledger: response.ledger,
+        });
+      }
+
+      // NOT_FOUND — not yet ingested; keep polling
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+
+    throw new TxTimeout(txHash, timeoutMs, attempts, consecutiveRpcErrors > 0);
+  }
   private toAppError(operation: SorobanOperation, error: unknown): AppError {
     if (error instanceof AppError) {
       return error;
@@ -273,3 +426,6 @@ export class SorobanService {
 }
 
 export const sorobanService = new SorobanService();
+
+
+

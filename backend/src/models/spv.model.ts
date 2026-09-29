@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mongoose model for SPV (Stellar Proof Verification) records.
  *
  * Schema design decisions:
@@ -63,7 +63,8 @@ const SPVSchema = new Schema<SPVDocument>(
   }
 );
 
-export const SPVRecordModel = model<SPVDocument>("SPVRecord", SPVSchema);
+export const SPVRecordModel = (mongoose.models.SPVRecord as mongoose.Model<SPVDocument>) ?? model<SPVDocument>("SPVRecord", SPVSchema);
 export const SPVModel = SPVRecordModel;
+
 
 

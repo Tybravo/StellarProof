@@ -1,51 +1,26 @@
-import { createHash } from 'crypto';
-import { StatusCodes } from 'http-status-codes';
-import mongoose from 'mongoose';
-import {
-  UploadRequest,
-  UploadResult,
-  StorageProvider,
-  StorageError,
-  CidResolutionResult,
-} from '../types/storage.types';
+import { computeSha256 } from '../utils/crypto';
+import { UploadRequest, UploadResult, StorageProvider, StorageError } from '../types/storage.types';
 import { cloudinaryService } from './cloudinary.service';
 import { ipfsService } from './ipfs.service';
-import StorageRecord, { IStorageRecord } from '../models/StorageRecord.model';
-import { AppError } from '../errors/AppError';
+import StorageRecord from '../models/StorageRecord.model';
 import { env } from '../config/env';
 import logger from '../utils/logger';
 
-/**
- * CIDv0: base58btc multihash starting with "Qm" (46 chars).
- * CIDv1: multibase base32 (lowercase, "b" prefix) as emitted by Pinata/Kubo.
- */
-const CID_V0_PATTERN = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
-const CID_V1_BASE32_PATTERN = /^b[a-z2-7]{50,}$/;
+/** Provider-level upload outcome, before fallback bookkeeping is attached. */
+type ProviderUpload = Omit<UploadResult, 'requestedProvider' | 'fallbackUsed'>;
+
+/** Providers the orchestrator can route to. */
+const STORAGE_PROVIDERS: readonly StorageProvider[] = ['cloudinary', 'ipfs'];
 
 export function isValidCid(cid: string): boolean {
   return CID_V0_PATTERN.test(cid) || CID_V1_BASE32_PATTERN.test(cid);
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+/** Mirrors the `maxlength` of StorageRecord.fallbackReason. */
+const MAX_FALLBACK_REASON_LENGTH = 1000;
 
-function sha256Hex(buffer: Buffer): string {
-  return createHash('sha256').update(buffer).digest('hex');
-}
-
-function isDuplicateKeyError(error: unknown, fields: string[]): boolean {
-  if (!(error instanceof mongoose.mongo.MongoServerError) || error.code !== 11000) {
-    return false;
-  }
-  const keys = Object.keys(error.keyPattern ?? {});
-  return keys.some((key) => fields.includes(key));
-}
-
-/** Accepts both "sha256:<hex>" and bare "<hex>" forms. */
-function normalizeSha256(hash: string): string {
-  return hash.trim().toLowerCase().replace(/^sha256:/, '');
-}
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 /**
  * Storage Orchestrator Service
@@ -53,6 +28,10 @@ function normalizeSha256(hash: string): string {
  * Consults the provider registry before each upload and fails over to the
  * next ranked provider when the preferred one is unhealthy or errors.
  * Ensures all uploads are persisted to MongoDB before returning
+ *
+ * IPFS uploads are resilient: if pinning errors or exceeds IPFS_UPLOAD_TIMEOUT_MS,
+ * the same buffer is transparently routed to Cloudinary and the StorageRecord
+ * records which provider actually holds the file.
  */
 class StorageOrchestratorService {
   constructor(private readonly registry: StorageProviderRegistry) {}
@@ -104,7 +83,6 @@ class StorageOrchestratorService {
       if (!this.canFallBack(request)) {
         throw primaryError;
       }
-    }
 
       const primaryReason = errorMessage(primaryError);
       logger.warn('IPFS upload failed; falling back to Cloudinary', {
@@ -140,112 +118,66 @@ class StorageOrchestratorService {
     // Persist result to MongoDB
     const storageRecord = new StorageRecord({
       userId: request.userId,
-      assetId: request.assetId,
-      kind: request.kind ?? 'media',
       provider: uploadResult.provider,
       url: uploadResult.url,
-      cid,
+      cid: uploadResult.cid,
       publicId: uploadResult.publicId,
-      contentHash,
-      fallbackFrom,
       size: uploadResult.size,
       mimetype: uploadResult.mimetype,
+      contentHash: request.contentHash ?? computeSha256(request.buffer),
       originalFilename: request.originalname,
       uploadedAt: uploadResult.uploadedAt,
+      pinningStatus: uploadResult.pinningStatus,
+      availability: uploadResult.availability,
     });
 
-    try {
-      const savedRecord = await storageRecord.save();
+    if (Object.keys(backfill).length === 0) {
+      return this.toUploadResult(record, true);
+    }
 
       // Return the saved record (not the provider result)
       // Ensures response data always comes from MongoDB
-      return this.toUploadResult(savedRecord, false);
+      return {
+        provider: savedRecord.provider,
+        requestedProvider: savedRecord.requestedProvider,
+        fallbackUsed: savedRecord.fallbackUsed,
+        url: savedRecord.url,
+        cid: savedRecord.cid,
+        publicId: savedRecord.publicId,
+        size: savedRecord.size,
+        mimetype: savedRecord.mimetype,
+        contentHash: savedRecord.contentHash,
+        uploadedAt: savedRecord.uploadedAt,
+      };
     } catch (dbError) {
-      // Lost a race with a concurrent upload of the same bytes: the unique
-      // cid (or cid-derived gateway url) index rejected our insert, so
-      // return the record that won.
-      if (cid && isDuplicateKeyError(dbError, ['cid', 'url'])) {
-        const winner = await this.runDbOperation(request.storageProvider, 'dedup-lookup', () =>
-          StorageRecord.findOne({ cid }).exec()
-        );
-        if (winner) {
-          return this.reuseRecord(winner, request, contentHash);
-        }
-      }
-
       throw new StorageError(
         uploadResult.provider,
         'persist',
-        `Failed to persist upload record to database: ${dbError instanceof Error ? dbError.message : String(dbError)}`,
+        `Failed to persist upload record to database: ${toErrorMessage(dbError)}`,
         500,
       );
     }
   }
 
   /**
-   * Link a StorageRecord to the Asset it stores. A record is linked to the
-   * first asset that claims it; later links for deduplicated bytes leave the
-   * original linkage untouched. Returns the record as stored.
+   * Uploads to the requested provider. When IPFS is requested and fails for
+   * any reason (provider error, network error, timeout), retries the same
+   * buffer on Cloudinary. Cloudinary requests are never redirected to IPFS.
    */
-  async linkAsset(recordId: string, assetId: string): Promise<UploadResult> {
-    if (!mongoose.Types.ObjectId.isValid(recordId) || !mongoose.Types.ObjectId.isValid(assetId)) {
-      throw new AppError('Invalid recordId or assetId', StatusCodes.BAD_REQUEST, 'INVALID_OBJECT_ID');
+  private async uploadWithFallback(request: UploadRequest): Promise<ResolvedUpload> {
+    if (request.storageProvider === 'cloudinary') {
+      return { uploadResult: await this.uploadToCloudinary(request) };
     }
 
-    const linked = await StorageRecord.findOneAndUpdate(
-      { _id: recordId, assetId: null },
-      { $set: { assetId } },
-      { new: true }
-    ).exec();
-    const record = linked ?? (await StorageRecord.findById(recordId).exec());
-
-    if (!record) {
-      throw new AppError('Storage record not found', StatusCodes.NOT_FOUND, 'STORAGE_RECORD_NOT_FOUND');
-    }
-
-    return this.toUploadResult(record, false);
-  }
-
-  /**
-   * Find the Asset that owns the given media bytes, if any.
-   * Used to link manifests (which carry the media contentHash) to their asset.
-   */
-  async findAssetIdByContentHash(contentHash: string): Promise<string | undefined> {
-    const record = await StorageRecord.findOne({
-      kind: 'media',
-      contentHash: normalizeSha256(contentHash),
-      assetId: { $ne: null },
-    })
-      .sort({ createdAt: 1 })
-      .select('assetId')
-      .exec();
-
-    return record?.assetId?.toString();
-  }
-
-  /** Only IPFS uploads that did not opt out fall back to Cloudinary. */
-  private canFallBack(request: UploadRequest): boolean {
-    return request.storageProvider === 'ipfs' && request.allowFallback !== false;
-  }
-
-  /**
-   * Upload to a single provider and normalise the provider response.
-   * Provider failures are surfaced as StorageError (502).
-   */
-  private async uploadToProvider(provider: StorageProvider, request: UploadRequest): Promise<UploadResult> {
     try {
-      switch (provider) {
-        case 'cloudinary': {
-          const cloudinaryUpload = await cloudinaryService.uploadBuffer(request.buffer);
-          return {
-            provider: 'cloudinary',
-            url: cloudinaryUpload.secure_url,
-            publicId: cloudinaryUpload.public_id,
-            size: cloudinaryUpload.bytes,
-            mimetype: request.mimetype,
-            uploadedAt: new Date(cloudinaryUpload.created_at),
-          };
-        }
+      return { uploadResult: await this.uploadToIpfs(request) };
+    } catch (ipfsError) {
+      const fallbackReason = toErrorMessage(ipfsError).slice(0, MAX_FALLBACK_REASON_LENGTH);
+      const logContext = {
+        userId: request.userId,
+        originalname: request.originalname,
+        size: request.buffer.length,
+      };
 
         case 'ipfs': {
           const ipfsUpload = await ipfsService.upload({
@@ -256,55 +188,72 @@ class StorageOrchestratorService {
           return {
             provider: 'ipfs',
             url: ipfsUpload.gatewayUrl,
+            gatewayUrl: ipfsUpload.gatewayUrl,
             cid: ipfsUpload.cid,
             size: ipfsUpload.size,
             mimetype: request.mimetype,
             uploadedAt: new Date(ipfsUpload.timestamp),
+            pinningStatus: ipfsUpload.pinningStatus,
+            availability: ipfsUpload.availability,
           };
         }
 
-        default: {
-          // TypeScript exhaustiveness check
-          const _exhaustive: never = provider;
-          throw new StorageError(provider, 'orchestrate', `Unhandled provider: ${_exhaustive}`, 500);
-        }
-      }
-    } catch (error) {
-      if (error instanceof StorageError) {
-        throw error;
-      }
+      try {
+        const uploadResult = await this.uploadToCloudinary(request);
+        logger.info('Cloudinary fallback upload succeeded', {
+          ...logContext,
+          publicId: uploadResult.publicId,
+        });
+        return { uploadResult, fallbackReason };
+      } catch (cloudinaryError) {
+        const cloudinaryReason = toErrorMessage(cloudinaryError);
+        logger.error('Cloudinary fallback upload failed after IPFS failure', {
+          ...logContext,
+          ipfsReason: fallbackReason,
+          cloudinaryReason,
+        });
 
-      throw new StorageError(provider, 'orchestrate', `Provider delegation failed: ${errorMessage(error)}`, 502);
+        // Both providers are down: report a structured, retryable error.
+        throw new StorageError(
+          'ipfs',
+          'upload',
+          `IPFS upload failed (${fallbackReason}) and Cloudinary fallback failed (${cloudinaryReason})`,
+          503,
+        );
+      }
     }
   }
 
-  /**
-   * Return an existing record for a deduplicated upload, backfilling the
-   * contentHash (legacy records) and asset link when they are missing.
-   */
-  private async reuseRecord(
-    record: IStorageRecord,
-    request: UploadRequest,
-    contentHash: string
-  ): Promise<UploadResult> {
-    const backfill: Partial<Pick<IStorageRecord, 'contentHash' | 'assetId'>> = {};
-    if (!record.contentHash) backfill.contentHash = contentHash;
-    if (!record.assetId && request.assetId) {
-      backfill.assetId = new mongoose.Types.ObjectId(request.assetId);
+  private async uploadToCloudinary(request: UploadRequest): Promise<ProviderUpload> {
+    try {
+      const cloudinaryUpload = await cloudinaryService.uploadBuffer(request.buffer);
+      return {
+        provider: 'cloudinary',
+        url: cloudinaryUpload.secure_url,
+        publicId: cloudinaryUpload.public_id,
+        size: cloudinaryUpload.bytes,
+        mimetype: request.mimetype,
+        uploadedAt: new Date(cloudinaryUpload.created_at),
+      };
+    } catch (error) {
+      throw new StorageError(
+        'cloudinary',
+        'upload',
+        `Provider delegation failed: ${toErrorMessage(error)}`,
+        502,
+      );
     }
+  }
 
-    if (Object.keys(backfill).length === 0) {
-      return this.toUploadResult(record, true);
-    }
-
-    const updated = await this.runDbOperation(request.storageProvider, 'persist', () =>
-      StorageRecord.findByIdAndUpdate(record._id, { $set: backfill }, { new: true }).exec()
+  private async uploadToIpfs(request: UploadRequest): Promise<ProviderUpload> {
+    const ipfsUpload = await this.withIpfsTimeout(
+      ipfsService.upload({
+        content: request.buffer,
+        name: request.originalname,
+      }),
+      request,
     );
 
-    return this.toUploadResult(updated ?? record, true);
-  }
-
-  private toUploadResult(record: IStorageRecord, deduplicated: boolean): UploadResult {
     return {
       recordId: String(record._id),
       provider: record.provider,
@@ -318,86 +267,53 @@ class StorageOrchestratorService {
       mimetype: record.mimetype,
       uploadedAt: record.uploadedAt,
       deduplicated,
+      // IPFS records store the CID as their URL; expose it under its
+      // provider-named key so every upload response carries `gatewayUrl`.
+      ...(record.provider === 'ipfs' && record.cid ? { gatewayUrl: record.url } : {}),
+      ...(record.pinningStatus ? { pinningStatus: record.pinningStatus } : {}),
+      ...(record.availability ? { availability: record.availability } : {}),
     };
-  }
-
-  private async runDbOperation<T>(
-    provider: StorageProvider,
-    operation: string,
-    fn: () => Promise<T>
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (dbError) {
-      throw new StorageError(
-        provider,
-        operation,
-        `Database operation failed: ${dbError instanceof Error ? dbError.message : String(dbError)}`,
-        500,
-      );
-    }
   }
 
   /**
-   * Resolve a CID against the IPFS gateway and verify it against the
-   * SHA-256 recorded for it at upload time.
-   * The StorageRecord is the source of truth: CIDs this service never
-   * stored are rejected with 404 rather than proxied to the gateway.
+   * Rejects if IPFS pinning does not settle within IPFS_UPLOAD_TIMEOUT_MS.
+   * A pin that completes after the deadline is not tracked by any
+   * StorageRecord, so its CID is logged for manual reconciliation.
    */
-  async resolveCid(cid: string): Promise<CidResolutionResult> {
-    if (!isValidCid(cid)) {
-      throw new AppError('Invalid IPFS CID format', StatusCodes.BAD_REQUEST, 'INVALID_CID');
+  private withIpfsTimeout<T extends { cid: string }>(
+    pending: Promise<T>,
+    request: UploadRequest,
+  ): Promise<T> {
+    const timeoutMs = env.IPFS_UPLOAD_TIMEOUT_MS;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      return pending;
     }
 
-    const record: IStorageRecord | null = await StorageRecord.findOne({ cid })
-      .sort({ createdAt: -1 })
-      .select('cid contentHash size')
-      .exec();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    if (!record) {
-      throw new AppError(`No storage record found for CID ${cid}`, StatusCodes.NOT_FOUND, 'CID_NOT_FOUND');
-    }
-
-    const fetchResult = await ipfsService.fetchFromGateway(cid, {
-      timeoutMs: env.IPFS_RESOLVE_TIMEOUT_MS,
-      maxBytes: env.IPFS_RESOLVE_MAX_BYTES,
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        reject(new Error(`IPFS pinning timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
     });
 
-    const base = {
-      cid,
-      expectedSize: record.size,
-      gatewayStatus: fetchResult.status,
-      checkedAt: new Date(),
-    };
+    pending.then(
+      (late) => {
+        if (timedOut) {
+          logger.warn('IPFS pin completed after timeout; CID is not tracked by any StorageRecord', {
+            userId: request.userId,
+            originalname: request.originalname,
+            cid: late.cid,
+          });
+        }
+      },
+      // Rejections are handled by the race below; swallow here to avoid an unhandled rejection.
+      () => undefined,
+    );
 
-    switch (fetchResult.status) {
-      case 'ok':
-        return {
-          ...base,
-          available: true,
-          size: fetchResult.size,
-          hashMatches: record.contentHash
-            ? normalizeSha256(record.contentHash) === fetchResult.sha256
-            : null,
-        };
-
-      case 'too_large':
-        return { ...base, available: true, size: fetchResult.declaredSize, hashMatches: null };
-
-      case 'not_found':
-      case 'timeout':
-      case 'unreachable':
-        return { ...base, available: false, size: null, hashMatches: null };
-
-      default: {
-        const _exhaustive: never = fetchResult;
-        throw new AppError(
-          `Unhandled gateway status: ${JSON.stringify(_exhaustive)}`,
-          StatusCodes.INTERNAL_SERVER_ERROR,
-          'CID_RESOLVE_FAILED'
-        );
-      }
-    }
+    return Promise.race([pending, timeout]).finally(() => clearTimeout(timer));
   }
 }
 
