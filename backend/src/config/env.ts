@@ -7,6 +7,7 @@
  * preventing silent misconfiguration at request time.
  */
 import "dotenv/config";
+import { StrKey } from "@stellar/stellar-sdk";
 
 function requireEnv(key: string): string {
   const value = process.env[key];
@@ -19,6 +20,34 @@ function requireEnv(key: string): string {
 
 function optionalEnv(key: string, fallback: string): string {
   return process.env[key] ?? fallback;
+}
+
+function requirePositiveIntEnv(key: string): number {
+  const raw = requireEnv(key);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    console.error(`[Config] ${key} must be a positive integer, got "${raw}"`);
+    process.exit(1);
+  }
+  return value;
+}
+
+function requireContractId(key: string): string {
+  const value = requireEnv(key);
+  if (!StrKey.isValidContract(value)) {
+    console.error(`[Config] ${key} must be a valid Stellar contract ID (C...)`);
+    process.exit(1);
+  }
+  return value;
+}
+
+function requireSecretSeed(key: string): string {
+  const value = requireEnv(key);
+  if (!StrKey.isValidEd25519SecretSeed(value)) {
+    console.error(`[Config] ${key} must be a valid Stellar Ed25519 secret seed (S...)`);
+    process.exit(1);
+  }
+  return value;
 }
 
 function optionalPositiveIntEnv(key: string, fallback: number): number {
@@ -83,6 +112,18 @@ export const env = {
    * contract uses a different function name (e.g. "balance_of").
    */
   STELLAR_NFT_BALANCE_FN: optionalEnv("STELLAR_NFT_BALANCE_FN", "balance"),
+
+
+  /**
+   * Canonical Soroban contract pipeline configuration.
+   * These values are required because the oracle/registry/provenance workers
+   * cannot safely start without validated contract identities and signer input.
+   */
+  ORACLE_CONTRACT_ID: requireContractId("ORACLE_CONTRACT_ID"),
+  PROVENANCE_CONTRACT_ID: requireContractId("PROVENANCE_CONTRACT_ID"),
+  REGISTRY_CONTRACT_ID: requireContractId("REGISTRY_CONTRACT_ID"),
+  ORACLE_SECRET_KEY: requireSecretSeed("ORACLE_SECRET_KEY"),
+  BASE_FEE: requirePositiveIntEnv("BASE_FEE"),
 
   /** Contract addresses, signers, and event ingestion settings. */
   STELLAR_REGISTRY_CONTRACT_ID: optionalEnv("STELLAR_REGISTRY_CONTRACT_ID", ""),
