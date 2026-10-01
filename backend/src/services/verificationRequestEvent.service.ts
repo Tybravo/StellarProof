@@ -44,6 +44,12 @@ export interface CompletionOutcome {
   certificateId?: string;
 }
 
+export interface TimelineEntry {
+  status: VerificationRequestEventStatus;
+  at: Date;
+  details?: Record<string, unknown>;
+}
+
 type EventUpdate = mongoose.UpdateQuery<IVerificationRequestEvent>;
 
 function serialize(doc: Record<string, unknown>): IVerificationRequestEvent {
@@ -105,7 +111,30 @@ class VerificationRequestEventService {
     );
   }
 
+  /**
+   * Appends a timeline entry and transitions the event to a new status.
+   * Timeline entries are appended atomically with `$push` so the full history
+   * is persisted even when multiple workers touch the event over time.
+   */
+  async recordStatusTransition(
+    eventId: string,
+    workerId: string,
+    status: VerificationRequestEventStatus,
+    details?: Record<string, unknown>
+  ): Promise<void> {
+    const entry: TimelineEntry = { status, at: new Date(), ...(details ? { details } : {}) };
+    await this.guardedUpdate(eventId, workerId, {
+      $set: { status },
+      $push: { timeline: entry },
+    });
+  }
+
   async markCompleted(eventId: string, workerId: string, outcome: CompletionOutcome): Promise<void> {
+    const entry: TimelineEntry = {
+      status: VerificationRequestEventStatus.COMPLETED,
+      at: new Date(),
+      details: { transactionHash: outcome.transactionHash, ...(outcome.certificateId ? { certificateId: outcome.certificateId } : {}) },
+    };
     await this.guardedUpdate(eventId, workerId, {
       $set: {
         status: VerificationRequestEventStatus.COMPLETED,
@@ -113,22 +142,52 @@ class VerificationRequestEventService {
         ...outcome,
       },
       $unset: { lockedBy: 1, lockedUntil: 1, lastError: 1 },
+      $push: { timeline: entry },
     });
   }
 
   async markFailed(eventId: string, workerId: string, error: string): Promise<void> {
+    const entry: TimelineEntry = {
+      status: VerificationRequestEventStatus.FAILED,
+      at: new Date(),
+      details: { error },
+    };
     await this.guardedUpdate(eventId, workerId, {
       $set: { status: VerificationRequestEventStatus.FAILED, lastError: error },
       $unset: { lockedBy: 1, lockedUntil: 1 },
+      $push: { timeline: entry },
     });
   }
 
   /** Releases the lease and makes the event claimable again at `nextAttemptAt`. */
   async scheduleRetry(eventId: string, workerId: string, nextAttemptAt: Date, error: string): Promise<void> {
+    const entry: TimelineEntry = {
+      status: VerificationRequestEventStatus.PENDING,
+      at: new Date(),
+      details: { error, nextAttemptAt: nextAttemptAt.toISOString() },
+    };
     await this.guardedUpdate(eventId, workerId, {
       $set: { status: VerificationRequestEventStatus.PENDING, nextAttemptAt, lastError: error },
       $unset: { lockedBy: 1, lockedUntil: 1 },
+      $push: { timeline: entry },
     });
+  }
+
+  /** Returns the persisted timeline for an event, ordered by append order. */
+  async getTimeline(eventId: string): Promise<TimelineEntry[]> {
+    const doc = await VerificationRequestEventModel.findById(eventId).lean<Record<string, unknown> | null>();
+    if (!doc) {
+      throw new AppError(
+        `Verification request event '${eventId}' not found`,
+        StatusCodes.NOT_FOUND,
+        "EVENT_NOT_FOUND"
+      );
+    }
+    const timeline = (doc as { timeline?: TimelineEntry[] }).timeline ?? [];
+    return timeline.map((entry) => ({
+      ...entry,
+      at: entry.at instanceof Date ? entry.at : new Date(entry.at),
+    }));
   }
 
   private async guardedUpdate(

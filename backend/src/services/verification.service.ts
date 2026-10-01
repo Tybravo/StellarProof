@@ -2,6 +2,7 @@
 import { StatusCodes } from "http-status-codes";
 
 import { VerificationJobModel } from "../models/verificationJob.model";
+import { VerificationRequestEventModel } from "../models/verificationRequestEvent.model";
 import { AppError } from "../errors/AppError";
 import { VerificationStateError } from "../errors/VerificationStateError";
 import Manifest from "../models/Manifest.model";
@@ -9,6 +10,7 @@ import { ipfsService } from "./ipfs.service";
 import { generateDeterministicHash } from "../utils/crypto";
 import {
   VerificationStatus,
+  VerificationWebhookEvent,
   VALID_TRANSITIONS,
 } from "../types/verification.types";
 import type {
@@ -16,8 +18,16 @@ import type {
   CreateVerificationJobDTO,
   UpdateVerificationStatusDTO,
   OracleCallbackDTO,
+  ListVerificationJobsQuery,
+  ListVerificationJobsResult,
+  JobStatusCounts,
+  JobStats,
+  JobTrendBucket,
 } from "../types/verification.types";
+import { VerificationRequestEventStatus } from "../types/verificationRequestEvent.types";
+import type { IVerificationRequestEvent } from "../types/verificationRequestEvent.types";
 import { statusStreamService } from "./statusStream.service";
+import { webhookService } from "./webhook.service";
 
 function assertValidObjectId(id: string): void {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -46,14 +56,47 @@ function assertValidTransition(
  * (e.g. entering `minting`); it is omitted otherwise.
  */
 function recordTimelineEntry(
-  job: { timeline: Array<{ stage: VerificationStatus; at: Date; txHash?: string }> },
+  job: { timeline: Array<{ stage: VerificationStatus; at: Date; actor: "worker" | "oracle" | "user"; txHash?: string }> },
   stage: VerificationStatus,
+  actor: "worker" | "oracle" | "user",
   txHash?: string
 ): void {
   job.timeline.push({
     stage,
     at: new Date(),
+    actor,
     ...(txHash ? { txHash } : {}),
+  });
+}
+
+export interface VerificationJobAccessContext {
+  role: "creator" | "developer" | "admin";
+  stellarPublicKey?: string;
+}
+
+function assertJobOwner(job: IVerificationJob, requester: VerificationJobAccessContext): void {
+  if (requester.role !== "admin" && requester.stellarPublicKey !== job.ownerPublicKey) {
+    throw new AppError("You do not have access to this verification job", StatusCodes.FORBIDDEN, "JOB_FORBIDDEN");
+  }
+}
+
+function dispatchWebhook(job: IVerificationJob, event: VerificationWebhookEvent): void {
+  if (!job.webhookUrl || !(job.webhookEvents ?? Object.values(VerificationWebhookEvent)).includes(event)) {
+    return;
+  }
+
+  const payload = {
+    event,
+    jobId: String(job._id),
+    contentHash: job.contentHash,
+    status: job.status,
+    timestamp: new Date().toISOString(),
+    ...(job.stellarTransactionHash ? { txHash: job.stellarTransactionHash } : {}),
+    ...(job.certificateId ? { certificateId: job.certificateId } : {}),
+    ...(job.errorMessage ? { errorMessage: job.errorMessage } : {}),
+  };
+  void webhookService.dispatchJobEvent(job.webhookUrl, payload).catch((error: unknown) => {
+    console.error("[Verification] Webhook dispatch failed", error);
   });
 }
 
@@ -65,7 +108,8 @@ async function createJob(dto: CreateVerificationJobDTO): Promise<IVerificationJo
     ...(dto.requestId ? { requestId: dto.requestId } : {}),
     status: VerificationStatus.PENDING,
     ...(dto.webhookUrl ? { webhookUrl: dto.webhookUrl } : {}),
-    timeline: [{ stage: VerificationStatus.PENDING, at: new Date() }],
+    ...(dto.webhookEvents ? { webhookEvents: dto.webhookEvents } : {}),
+    timeline: [{ stage: VerificationStatus.PENDING, at: new Date(), actor: "user" }],
   });
 
   await statusStreamService.broadcast(
@@ -97,9 +141,91 @@ async function getJobsByOwner(ownerPublicKey: string): Promise<IVerificationJob[
     .lean<IVerificationJob[]>();
 }
 
+async function getJobTimeline(id: string, requester: VerificationJobAccessContext) {
+  const job = await getJob(id);
+  assertJobOwner(job, requester);
+  return job.timeline.map(({ stage, at, actor, txHash }) => ({
+    stage,
+    timestamp: at,
+    actor: actor ?? "worker",
+    ...(txHash ? { txHash } : {}),
+  }));
+}
+
+async function retryJob(id: string, requester: VerificationJobAccessContext): Promise<IVerificationJob> {
+  const failedJob = await getJob(id);
+  assertJobOwner(failedJob, requester);
+  if (failedJob.status !== VerificationStatus.FAILED) {
+    throw new AppError("Only failed verification jobs can be retried", StatusCodes.CONFLICT, "JOB_NOT_FAILED");
+  }
+
+  const sourceEvent = failedJob.requestId
+    ? await VerificationRequestEventModel.findOne({ eventId: failedJob.requestId }).lean<IVerificationRequestEvent>()
+    : null;
+  if (!sourceEvent) {
+    throw new AppError(
+      "The original verification request is unavailable and cannot be resubmitted",
+      StatusCodes.CONFLICT,
+      "RETRY_SOURCE_NOT_FOUND"
+    );
+  }
+  if (sourceEvent.requester !== failedJob.ownerPublicKey) {
+    throw new AppError(
+      "The original verification request does not belong to this job owner",
+      StatusCodes.CONFLICT,
+      "RETRY_SOURCE_MISMATCH"
+    );
+  }
+
+  try {
+    const requestId = new mongoose.Types.ObjectId().toString();
+    const newJob = await VerificationJobModel.create({
+      ...(failedJob.manifestId ? { manifestId: failedJob.manifestId } : {}),
+      ...(failedJob.assetId ? { assetId: failedJob.assetId } : {}),
+      ownerPublicKey: failedJob.ownerPublicKey,
+      contentHash: failedJob.contentHash,
+      ...(failedJob.manifestHash ? { manifestHash: failedJob.manifestHash } : {}),
+      requestId,
+      status: VerificationStatus.PENDING,
+      ...(failedJob.webhookUrl ? { webhookUrl: failedJob.webhookUrl } : {}),
+      ...(failedJob.webhookEvents ? { webhookEvents: failedJob.webhookEvents } : {}),
+      timeline: [{ stage: VerificationStatus.PENDING, at: new Date(), actor: "user" }],
+    });
+    try {
+      await VerificationRequestEventModel.create({
+        eventId: requestId,
+        mediaCid: sourceEvent.mediaCid,
+        manifestCid: sourceEvent.manifestCid,
+        requester: sourceEvent.requester,
+        status: VerificationRequestEventStatus.PENDING,
+        attempts: 0,
+        nextAttemptAt: new Date(),
+        verificationJobId: newJob._id,
+        contentHash: failedJob.contentHash,
+        ...(failedJob.manifestHash ? { manifestHash: failedJob.manifestHash } : {}),
+      });
+    } catch (error) {
+      await VerificationJobModel.deleteOne({ _id: newJob._id, status: VerificationStatus.PENDING });
+      throw error;
+    }
+    await statusStreamService.broadcast(String(newJob._id), VerificationStatus.PENDING);
+    return newJob.toObject<IVerificationJob>();
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      throw new AppError(
+        "An active verification job already exists for this content",
+        StatusCodes.CONFLICT,
+        "ACTIVE_JOB_EXISTS"
+      );
+    }
+    throw error;
+  }
+}
+
 async function updateJobStatus(
   id: string,
-  dto: UpdateVerificationStatusDTO
+  dto: UpdateVerificationStatusDTO,
+  actor: "worker" | "oracle" | "user" = "worker"
 ): Promise<IVerificationJob> {
   assertValidObjectId(id);
 
@@ -155,8 +281,9 @@ async function updateJobStatus(
   if (dto.stellarTransactionHash !== undefined)
     job.stellarTransactionHash = dto.stellarTransactionHash;
   if (dto.errorMessage !== undefined) job.errorMessage = dto.errorMessage;
+  if (dto.certificateId !== undefined) job.certificateId = dto.certificateId;
 
-  recordTimelineEntry(job, nextStatus, dto.stellarTransactionHash);
+  recordTimelineEntry(job, nextStatus, actor, dto.stellarTransactionHash);
 
   await job.save();
 
@@ -168,7 +295,14 @@ async function updateJobStatus(
     errorMessage: job.errorMessage,
   });
 
-  return job.toObject<IVerificationJob>();
+  const updatedJob = job.toObject<IVerificationJob>();
+  if (nextStatus === VerificationStatus.FAILED) dispatchWebhook(updatedJob, VerificationWebhookEvent.FAILED);
+  if (nextStatus === VerificationStatus.COMPLETED) {
+    dispatchWebhook(updatedJob, VerificationWebhookEvent.COMPLETED);
+    if (updatedJob.certificateId) dispatchWebhook(updatedJob, VerificationWebhookEvent.MINTED);
+  }
+
+  return updatedJob;
 }
 
 async function receiveOracleAttestation(
@@ -194,7 +328,7 @@ async function receiveOracleAttestation(
   job.teeSignature = dto.teeSignature;
   job.status = nextStatus;
 
-  recordTimelineEntry(job, nextStatus);
+  recordTimelineEntry(job, nextStatus, "oracle");
 
   await job.save();
 
@@ -245,7 +379,12 @@ async function advanceFromAttestationEvent(
     job.status = VerificationStatus.MINTING;
     job.attestationTransactionHash = event.transactionHash;
     if (event.attestationHash) job.teeAttestationHash = event.attestationHash;
+    recordTimelineEntry(job, VerificationStatus.MINTING, "oracle", event.transactionHash);
     await job.save();
+    await statusStreamService.broadcast(String(job._id), VerificationStatus.MINTING, {
+      attestationTransactionHash: event.transactionHash,
+      teeAttestationHash: job.teeAttestationHash,
+    });
   }
   return job.toObject<IVerificationJob>();
 }
@@ -260,7 +399,16 @@ async function completeFromMintEvent(
     job.status = VerificationStatus.COMPLETED;
     job.stellarTransactionHash = event.transactionHash;
     job.certificateId = event.certificateId;
+    recordTimelineEntry(job, VerificationStatus.COMPLETED, "oracle", event.transactionHash);
     await job.save();
+    await statusStreamService.broadcast(String(job._id), VerificationStatus.COMPLETED, {
+      stellarTransactionHash: event.transactionHash,
+      certificateId: event.certificateId,
+    });
+    const completedJob = job.toObject<IVerificationJob>();
+    dispatchWebhook(completedJob, VerificationWebhookEvent.COMPLETED);
+    dispatchWebhook(completedJob, VerificationWebhookEvent.MINTED);
+    return completedJob;
   }
   return job.toObject<IVerificationJob>();
 }
@@ -269,10 +417,52 @@ export const verificationService = {
   createJob,
   getJob,
   getJobsByOwner,
+  listJobs,
+  getJobStats,
+  assertJobOwner,
   updateJobStatus,
   receiveOracleAttestation,
   advanceFromAttestationEvent,
   completeFromMintEvent,
+  getJobTimeline,
+  retryJob,
+  failStaleJobs: async (cutoff: Date): Promise<number> => {
+    const staleJobs = await VerificationJobModel.find({
+      status: { $in: [VerificationStatus.TEE_VERIFYING, VerificationStatus.MINTING] },
+      updatedAt: { $lt: cutoff },
+    }).select({ _id: 1, status: 1 });
+
+    let failedCount = 0;
+    for (const staleJob of staleJobs) {
+      const failureReason = `Verification job timed out while in '${staleJob.status}'.`;
+      const failedJob = await VerificationJobModel.findOneAndUpdate(
+        {
+          _id: staleJob._id,
+          status: staleJob.status,
+          updatedAt: { $lt: cutoff },
+        },
+        {
+          $set: { status: VerificationStatus.FAILED, errorMessage: failureReason },
+          $push: {
+            timeline: {
+              stage: VerificationStatus.FAILED,
+              at: new Date(),
+              actor: "worker",
+            },
+          },
+        },
+        { new: true }
+      ).lean<IVerificationJob>();
+
+      if (!failedJob) continue;
+      failedCount += 1;
+      await statusStreamService.broadcast(String(failedJob._id), VerificationStatus.FAILED, {
+        errorMessage: failureReason,
+      });
+      dispatchWebhook(failedJob, VerificationWebhookEvent.FAILED);
+    }
+    return failedCount;
+  },
 } as const;
 
 /**

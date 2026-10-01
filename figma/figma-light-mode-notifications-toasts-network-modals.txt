@@ -1,0 +1,10 @@
+Figma Design Light Mode done.
+
+Here are the issues below and link
+
+1. Notifications
+2. Toasts
+3. Network Latency & Node Health — Pie Charts View
+4. Global Modals
+
+https://www.figma.com/design/2kP82C0Z8z0X3CncLQmfhB/Stellar-Project-Fig?node-id=3104-2&p=f&t=YxVm0kSu6XqIEPkD-0

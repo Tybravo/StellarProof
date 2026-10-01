@@ -24,6 +24,7 @@ import type {
   UpdateVerificationStatusDTO,
   OracleCallbackDTO,
   IVerificationJob,
+  ListVerificationJobsQuery,
 } from "../types/verification.types";
 import { VerificationStatus } from "../types/verification.types";
 
@@ -84,7 +85,7 @@ export class VerificationController {
         ownerPublicKey: user.stellarPublicKey || manifest.creator,
         contentHash: manifest.contentHash,
         status: VerificationStatus.PENDING,
-        timeline: [{ stage: VerificationStatus.PENDING, at: new Date() }],
+        timeline: [{ stage: VerificationStatus.PENDING, at: new Date(), actor: "user" }],
       });
 
       res.status(StatusCodes.CREATED).json({
@@ -144,21 +145,98 @@ export class VerificationController {
     }
   }
 
-  /**
-   * GET /api/v1/verification/jobs?ownerPublicKey=G...
-   * Lists all VerificationJobs belonging to the given owner.
-   */
-  async listJobsByOwner(
+  /** GET /api/v1/verification/jobs/:id/timeline */
+  async getTimeline(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { ownerPublicKey } = req.query as { ownerPublicKey: string };
-      const jobs = await verificationService.getJobsByOwner(ownerPublicKey);
+      const requester = req.user;
+      const timeline = await verificationService.getJobTimeline(req.params.id, {
+        role: requester.role,
+        stellarPublicKey: requester.stellarPublicKey,
+      });
+      res.status(StatusCodes.OK).json({ success: true, data: timeline });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /** POST /api/v1/verification/jobs/:id/retry */
+  async retryJob(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const requester = req.user;
+      const job = await verificationService.retryJob(req.params.id, {
+        role: requester.role,
+        stellarPublicKey: requester.stellarPublicKey,
+      });
+      res.status(StatusCodes.CREATED).json({
+        success: true,
+        data: job,
+        message: "Verification job retry submitted successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/verification/jobs
+   * Lists the caller's jobs with pagination, status, date range, and contentHash search.
+   */
+  async listJobsByOwner(
+    _req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const ownerPublicKey = res.locals.ownerPublicKey as string | undefined;
+      const parsed = res.locals.listJobsQuery as Omit<ListVerificationJobsQuery, "ownerPublicKey"> | undefined;
+      if (!ownerPublicKey || !parsed) {
+        throw new AppError("Verification job not found", StatusCodes.NOT_FOUND, "JOB_NOT_FOUND");
+      }
+
+      const result = await verificationService.listJobs({
+        ...parsed,
+        ownerPublicKey,
+      });
+
       res.status(StatusCodes.OK).json({
         success: true,
-        data: jobs,
+        data: result.jobs,
+        total: result.total,
+        limit: result.limit,
+        skip: result.skip,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/verification/jobs/stats
+   * Counts the caller's jobs by status and returns the success rate plus daily trends.
+   */
+  async getJobStats(
+    _req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const ownerPublicKey = res.locals.ownerPublicKey as string | undefined;
+      if (!ownerPublicKey) {
+        throw new AppError("Verification job not found", StatusCodes.NOT_FOUND, "JOB_NOT_FOUND");
+      }
+
+      const stats = await verificationService.getJobStats(ownerPublicKey);
+      res.status(StatusCodes.OK).json({
+        success: true,
+        data: stats,
       });
     } catch (err) {
       next(err);
@@ -179,7 +257,8 @@ export class VerificationController {
       const dto = req.body as UpdateVerificationStatusDTO;
       const job = await verificationService.updateJobStatus(
         req.params.id,
-        dto
+        dto,
+        "user"
       );
       res.status(StatusCodes.OK).json({
         success: true,

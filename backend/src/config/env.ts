@@ -107,6 +107,12 @@ export const env = {
   /** Morgan log format: 'dev' | 'combined' | 'tiny' etc. */
   LOG_LEVEL: optionalEnv("LOG_LEVEL", "dev"),
 
+  /**
+   * Shared secret for POST /api/v1/verification/jobs/oracle/callback.
+   * Empty means the callback rejects every caller (fail closed).
+   */
+  ORACLE_CALLBACK_KEY: optionalEnv("ORACLE_CALLBACK_KEY", ""),
+
   /** Secret used to sign and verify JWTs */
   JWT_SECRET: requireEnv("JWT_SECRET"),
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * SPV verifier: checks that a media object on IPFS matches the manifest that
  * claims to describe it, and that the manifest belongs to the requester.

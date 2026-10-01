@@ -1,0 +1,12 @@
+Included Designs
+Network Latency & Node Health — Bar Charts View
+Presents Oracle uptime and response-speed information through bar-based visualizations.
+Network Latency & Node Health — Line Charts View
+Provides a time-oriented visualization of Oracle network latency, uptime, and response performance.
+Oracle Provider Staking Dashboard
+Defines the interface for node operators to manage XLM collateral and review staking rewards.
+Governance Voting UI
+Establishes the voting experience for submitting an XLM-weighted vote on a governance proposal.
+
+https://www.figma.com/design/2kP82C0Z8z0X3CncLQmfhB/Stellar-Project-Fig?node-id=3104-2&p=f&t=YxVm0kSu6XqIEPkD-0
+

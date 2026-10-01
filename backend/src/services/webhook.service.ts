@@ -1,6 +1,15 @@
-export interface VerificationCompletedWebhookPayload {
+import { VerificationWebhookEvent } from "../types/verification.types";
+import type { VerificationStatus } from "../types/verification.types";
+
+export interface VerificationWebhookPayload {
+  event: VerificationWebhookEvent;
   jobId: string;
-  certificateId: string;
+  contentHash?: string;
+  status?: VerificationStatus;
+  timestamp?: string;
+  txHash?: string;
+  certificateId?: string;
+  errorMessage?: string;
 }
 
 export class WebhookService {
@@ -29,9 +38,9 @@ export class WebhookService {
     }
   }
 
-  async dispatchVerificationCompleted(
+  async dispatchJobEvent(
     webhookUrl: string,
-    payload: VerificationCompletedWebhookPayload
+    payload: VerificationWebhookPayload
   ): Promise<boolean> {
     if (!this.isValidWebhookUrl(webhookUrl)) {
       console.error(`Invalid webhook URL provided: ${webhookUrl}`);
@@ -78,6 +87,16 @@ export class WebhookService {
       `[Webhook Service] Webhook delivery failed after ${this.maxRetries + 1} attempts for ${webhookUrl}`
     );
     return false;
+  }
+
+  async dispatchVerificationCompleted(
+    webhookUrl: string,
+    payload: Omit<VerificationWebhookPayload, "event" | "status" | "timestamp" | "contentHash">
+  ): Promise<boolean> {
+    return this.dispatchJobEvent(webhookUrl, {
+      ...payload,
+      event: VerificationWebhookEvent.COMPLETED,
+    });
   }
 }
 

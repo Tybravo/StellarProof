@@ -8,8 +8,8 @@
  * - `status` is indexed: efficient filtering by lifecycle state.
  * - TEE and blockchain fields are optional at schema level; the service layer
  *   enforces their presence when the associated state transition occurs.
- * - `timeline` is an append-only sub-document array recording every stage
- *   transition; entries are never mutated or removed, only pushed.
+ * - Timeline entries are persisted as an array of sub-documents so the full
+ *   state-machine traversal can be audited.
  * - Timestamps are enabled via Mongoose options (adds `createdAt` / `updatedAt`).
  *
  * Also defines the worker's per-request bookkeeping, keyed by the request
@@ -28,29 +28,42 @@ import type { IVerificationJob, ITimelineEntry } from "../types/verification.typ
 export type VerificationJobDocument = IVerificationJob & Document;
 
 const ALL_STATUSES = Object.values(VerificationStatus);
+const ALL_WEBHOOK_EVENTS = Object.values(VerificationWebhookEvent);
+const ACTIVE_STATUSES = [
+  VerificationStatus.PENDING,
+  VerificationStatus.PROCESSING,
+  VerificationStatus.TEE_VERIFYING,
+  VerificationStatus.MINTING,
+];
 
-const TimelineEntrySchema = new Schema<ITimelineEntry>(
+const VerificationTimelineEntrySchema = new Schema<IVerificationTimelineEntry>(
   {
-    stage: {
+    status: {
       type: String,
-      required: [true, "timeline entry stage is required"],
+      required: [true, "timeline entry status is required"],
       enum: {
         values: ALL_STATUSES,
-        message: `timeline stage must be one of: ${ALL_STATUSES.join(", ")}`,
+        message: `timeline entry status must be one of: ${ALL_STATUSES.join(", ")}`,
       },
     },
-    at: {
+    timestamp: {
       type: Date,
       required: [true, "timeline entry timestamp is required"],
       default: Date.now,
     },
-    txHash: {
+    message: {
       type: String,
       trim: true,
       default: undefined,
     },
+    actor: {
+      type: String,
+      enum: ["worker", "oracle", "user"],
+      required: true,
+      default: "worker",
+    },
   },
-  { _id: false }
+  { _id: false, versionKey: false }
 );
 
 const VerificationJobSchema = new Schema<VerificationJobDocument>(
@@ -102,13 +115,13 @@ const VerificationJobSchema = new Schema<VerificationJobDocument>(
       index: true,
     },
 
-    // Append-only stage history, oldest first.
+    // Timeline of state-machine transitions
     timeline: {
-      type: [TimelineEntrySchema],
+      type: [VerificationTimelineEntrySchema],
       default: [],
     },
 
-    // TEE attestation fields
+    // TE attestation fields
     teeAttestationHash: {
       type: String,
       trim: true,
@@ -155,10 +168,24 @@ const VerificationJobSchema = new Schema<VerificationJobDocument>(
       trim: true,
       default: undefined,
     },
+    webhookEvents: {
+      type: [String],
+      enum: ALL_WEBHOOK_EVENTS,
+      default: ALL_WEBHOOK_EVENTS,
+    },
   },
   {
     timestamps: true,
     versionKey: false,
+  }
+);
+
+VerificationJobSchema.index(
+  { contentHash: 1 },
+  {
+    unique: true,
+    name: "unique_active_job_per_content_hash",
+    partialFilterExpression: { status: { $in: ACTIVE_STATUSES } },
   }
 );
 

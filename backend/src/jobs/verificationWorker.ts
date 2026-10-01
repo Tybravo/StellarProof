@@ -218,12 +218,7 @@ export function startManifestRehashWorker(): void {
       const result = await this.verifyOnce(event, entry);
 
       if (!job) {
-        job = await jobs.createJob({
-          ownerPublicKey: event.requester,
-          contentHash: result.contentHash,
-          manifestHash: result.manifestHash,
-          requestId: event.eventId,
-        });
+        job = await jobs.createJob({ wnerPublicKey: event.requester, contentHash: result.contentHash });
         await events.attachJob(event._id, this.workerId, String(job._id));
       }
       const id = String(job._id);

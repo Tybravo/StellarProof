@@ -11,6 +11,7 @@
     "start:worker": "node dist/jobs/verificationWorker.js",
     "lint": "eslint . --ext .ts",
     "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js --runInBand",
     "seed:kms": "ts-node-dev --transpile-only src/utils/seedKMSData.ts",
     "typecheck": "tsc --noEmit"
   },

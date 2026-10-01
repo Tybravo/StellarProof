@@ -1,8 +1,8 @@
 /**
  * Builds the oracle's signed attestation over a successful SPV verification.
  *
- * The attestation hash is a deterministic SHA-256 over the verified facts, so
- * a retried request yields the same hash. The signature is the oracle
+ * The attestation hash is a deterministic SHA-256 over the verified facts, so a
+ * retried request yields the same hash. The signature is the oracle
  * keypair's Ed25519 signature over the raw 32-byte hash.
  *
  * The code measurement hash is retrieved from the TEEConfig service to ensure
@@ -33,36 +33,8 @@ export interface Attestation {
   codeMeasurementHash: string;
 }
 
-class AttestationService {
-  /**
-   * Create an attestation using the active TEE config's code measurement hash
-   * Retrieves the code measurement hash from the database to ensure authenticity
-   */
-  async createAttestationWithTEEConfig(
-    input: AttestationInput,
-    keypair: Keypair,
-    environment: 'testnet' | 'mainnet' | 'development' = 'testnet'
-  ): Promise<Attestation> {
-    // Retrieve the active TEE configuration for the specified environment
-    const teeConfig = await teeConfigService.getActiveTEEConfig(environment);
-
-    if (!teeConfig) {
-      throw new AppError(
-        `No active TEE configuration found for environment: ${environment}`,
-        500,
-        'TEE_CONFIG_NOT_FOUND'
-      );
-    }
-
-    // Use the persisted code measurement hash from the database
-    return this.createAttestationWithHash(input, keypair, teeConfig.codeMeasurementHash);
-  }
-
-  /**
-   * Create an attestation with an explicit code measurement hash
-   * This method allows for flexibility when the hash is already known
-   */
-  createAttestationWithHash(
+export class AttestationService {
+  createAttestation(
     input: AttestationInput,
     keypair: Keypair,
     codeMeasurementHash: string
