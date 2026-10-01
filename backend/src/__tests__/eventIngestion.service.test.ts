@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { nativeToScVal, StrKey, xdr, type rpc } from "@stellar/stellar-sdk";
 import { EventIngestionService } from "../services/eventIngestion.service";
+import type {
+  IngestedSorobanEvent,
+  SorobanEventBus,
+} from "../services/sorobanEventBus.service";
 import { VerificationJobModel } from "../models/verificationJob.model";
 import { verificationService } from "../services/verification.service";
 import { VerificationStatus } from "../types/verification.types";
@@ -9,7 +13,7 @@ const contractId = (): string => StrKey.encodeContract(crypto.randomBytes(32));
 const hash = (): string => crypto.randomBytes(32).toString("hex");
 
 function event(
-  name: "attestation" | "CertificateMinted",
+  name: "VerificationRequest" | "attestation" | "CertificateMinted",
   payload: Record<string, unknown>,
   pagingToken: string
 ): rpc.Api.EventResponse {
@@ -34,27 +38,77 @@ describe("EventIngestionService", () => {
       getEvents: jest.fn(async () => ({ latestLedger: 205, events, cursor: "page-end" })),
     };
     const jobs = {
-      advanceFromAttestationEvent: jest.fn(async () => ({ _id: "job-1" } as never)),
-      completeFromMintEvent: jest.fn(async () => ({ _id: "job-1" } as never)),
+      advanceFromAttestationEvent: jest.fn(async () => ({ _id: "job-1" })),
+      completeFromMintEvent: jest.fn(async () => ({ _id: "job-1" })),
     };
     const cursors = {
       get: jest.fn(async (): Promise<{ cursor: string; latestLedger: number } | null> => null),
       save: jest.fn(async () => undefined),
     };
     const minter = { mintForJob: jest.fn(async () => ({ certificateId: "1" })) };
+    const published: IngestedSorobanEvent[] = [];
+    const bus: SorobanEventBus = {
+      subscribe: jest.fn(() => () => undefined),
+      publish: jest.fn(async (publishedEvent) => {
+        published.push(publishedEvent);
+        if (
+          publishedEvent.kind === "verificationRequest" ||
+          publishedEvent.kind === "registry"
+        ) {
+          return 0;
+        }
+
+        const job =
+          publishedEvent.kind === "certificateMinted"
+            ? await jobs.completeFromMintEvent({
+                manifestHash: publishedEvent.manifestHash,
+                requestId: publishedEvent.requestId,
+                certificateId: publishedEvent.certificateId,
+                transactionHash: publishedEvent.transactionHash,
+              })
+            : await jobs.advanceFromAttestationEvent({
+                manifestHash: publishedEvent.manifestHash,
+                requestId: publishedEvent.requestId,
+                attestationHash: publishedEvent.attestationHash,
+                transactionHash: publishedEvent.transactionHash,
+              });
+
+        if (!job) return 0;
+        if (publishedEvent.kind === "attestation" && job._id) {
+          await minter.mintForJob(String(job._id));
+        }
+        return 1;
+      }),
+    };
+    const oracleContractId = contractId();
+    const provenanceContractId = contractId();
+    const registryContractId = contractId();
     const service = new EventIngestionService(
       rpcClient,
-      jobs,
+      jobs as never,
       cursors,
       {
-        oracleContractId: contractId(),
-        provenanceContractId: contractId(),
+        oracleContractId,
+        provenanceContractId,
+        registryContractId,
         startLedger: 100,
         limit: 50,
       },
-      minter
+      minter,
+      bus
     );
-    return { service, rpcClient, jobs, cursors, minter };
+    return {
+      service,
+      rpcClient,
+      jobs,
+      cursors,
+      minter,
+      bus,
+      published,
+      oracleContractId,
+      provenanceContractId,
+      registryContractId,
+    };
   }
 
   it("filters contract events and advances a correlated job to minting", async () => {
@@ -69,7 +123,48 @@ describe("EventIngestionService", () => {
 
     await expect(h.service.ingestOnce()).resolves.toMatchObject({ matched: 1, correlated: 1 });
     expect(h.rpcClient.getEvents).toHaveBeenCalledWith(
-      expect.objectContaining({ startLedger: 100, limit: 50, filters: expect.any(Array) })
+      expect.objectContaining({
+        startLedger: 100,
+        limit: 50,
+        filters: [
+          {
+            type: "contract",
+            contractIds: [h.oracleContractId],
+            topics: [
+              [xdr.ScVal.scvSymbol("VerificationRequest").toXDR("base64")],
+              [xdr.ScVal.scvSymbol("Attestation").toXDR("base64")],
+              [xdr.ScVal.scvSymbol("Attested").toXDR("base64")],
+            ],
+          },
+          {
+            type: "contract",
+            contractIds: [h.provenanceContractId],
+            topics: [[xdr.ScVal.scvSymbol("CertificateMinted").toXDR("base64")]],
+          },
+          {
+            type: "contract",
+            contractIds: [h.registryContractId],
+            topics: [
+              [
+                xdr.ScVal.scvSymbol("registry").toXDR("base64"),
+                xdr.ScVal.scvSymbol("TeeHashAdded").toXDR("base64"),
+              ],
+              [
+                xdr.ScVal.scvSymbol("registry").toXDR("base64"),
+                xdr.ScVal.scvSymbol("TeeHashRemoved").toXDR("base64"),
+              ],
+              [
+                xdr.ScVal.scvSymbol("registry").toXDR("base64"),
+                xdr.ScVal.scvSymbol("ProviderAdded").toXDR("base64"),
+              ],
+              [
+                xdr.ScVal.scvSymbol("registry").toXDR("base64"),
+                xdr.ScVal.scvSymbol("ProviderRemoved").toXDR("base64"),
+              ],
+            ],
+          },
+        ],
+      })
     );
     expect(h.jobs.advanceFromAttestationEvent).toHaveBeenCalledWith({
       manifestHash,
@@ -79,6 +174,35 @@ describe("EventIngestionService", () => {
     });
     expect(h.cursors.save).toHaveBeenCalledWith("200-1", 200);
     expect(h.minter.mintForJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("publishes VerificationRequest without fabricating a job transition", async () => {
+    const contentHash = hash();
+    const chainEvent = event(
+      "VerificationRequest",
+      { id: 7n, content_hash: contentHash, state: "Pending" },
+      "200-vr"
+    );
+    const h = harness([chainEvent]);
+
+    await expect(h.service.ingestOnce()).resolves.toMatchObject({
+      matched: 1,
+      correlated: 0,
+    });
+
+    expect(h.published).toEqual([
+      expect.objectContaining({
+        kind: "verificationRequest",
+        eventId: chainEvent.id,
+        requestId: "7",
+        contentHash,
+        state: "Pending",
+      }),
+    ]);
+    expect(h.jobs.advanceFromAttestationEvent).not.toHaveBeenCalled();
+    expect(h.jobs.completeFromMintEvent).not.toHaveBeenCalled();
+    expect(h.minter.mintForJob).not.toHaveBeenCalled();
+    expect(h.cursors.save).toHaveBeenCalledWith("200-vr", 200);
   });
 
   it("records CertificateMinted results and resumes from the durable cursor", async () => {
