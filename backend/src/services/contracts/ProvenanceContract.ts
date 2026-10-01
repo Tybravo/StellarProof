@@ -7,12 +7,20 @@ import {
 import { StatusCodes } from "http-status-codes";
 import { AppError } from "../../errors/AppError";
 import type { SorobanService } from "../soroban.service";
-import type { ContractQueryClient } from "./ContractReader";
 import { buildMintArgs, toU64ScVal, type MintArgs } from "../../utils/xdr";
+import type { ContractQueryClient } from "./ContractReader";
 
 export interface PreparedMint {
   transactionHash: string;
   transaction: Transaction;
+}
+
+export interface ProvenanceCertificate {
+  storageId: string;
+  manifestHash: string;
+  attestationHash: string;
+  creator: string;
+  timestamp: string;
 }
 
 export interface MintConfirmation {
@@ -65,10 +73,18 @@ export class ProvenanceContract {
   );
   constructor(
     private readonly contractId: string,
-    clientOrSigner: ContractQueryClient | Keypair,
-    soroban?: ProvenanceSorobanClient,
-    confirmationTimeoutMs = 120_000,
-    pollIntervalMs = 1_000
+    private readonly signer: Keypair,
+    soroban?: Pick<
+      SorobanService,
+      | "loadAccount"
+      | "simulate"
+      | "sendTransaction"
+      | "getTransaction"
+      | "networkPassphrase"
+    >,
+    private readonly confirmationTimeoutMs = 120_000,
+    private readonly pollIntervalMs = 1_000,
+    private readonly queryClient?: ContractQueryClient
   ) {
     if (!StrKey.isValidContract(contractId)) {
       throw new AppError(
@@ -175,6 +191,58 @@ export class ProvenanceContract {
       attestationHash: attestation_hash,
       creator,
       timestamp: new Date(Number(timestamp) * 1_000),
+    };
+  }
+
+  async getCertificate(certificateId: bigint | number): Promise<ProvenanceCertificate> {
+    if (!this.queryClient) {
+      throw new AppError(
+        "Provenance query client is not configured",
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "PROVENANCE_QUERY_NOT_CONFIGURED"
+      );
+    }
+
+    const result = await this.queryClient.invoke({
+      contractId: this.contractId,
+      method: "get_certificate",
+      args: [toU64ScVal(certificateId, "certificateId")],
+    });
+    const value = scValToNative(result) as unknown;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new AppError(
+        "Provenance get_certificate returned an invalid response",
+        StatusCodes.BAD_GATEWAY,
+        "PROVENANCE_INVALID_RESPONSE"
+      );
+    }
+    const record = value as Record<string, unknown>;
+    const storageId = record.storage_id ?? record.storageId;
+    const manifestHash = record.manifest_hash ?? record.manifestHash;
+    const attestationHash = record.attestation_hash ?? record.attestationHash;
+    const creator = record.creator;
+    const timestamp = record.timestamp;
+
+    if (
+      typeof storageId !== "string" ||
+      typeof manifestHash !== "string" ||
+      typeof attestationHash !== "string" ||
+      typeof creator !== "string" ||
+      (typeof timestamp !== "bigint" && typeof timestamp !== "number")
+    ) {
+      throw new AppError(
+        "Provenance get_certificate returned malformed certificate fields",
+        StatusCodes.BAD_GATEWAY,
+        "PROVENANCE_INVALID_RESPONSE"
+      );
+    }
+
+    return {
+      storageId,
+      manifestHash,
+      attestationHash,
+      creator,
+      timestamp: String(timestamp),
     };
   }
 

@@ -41,15 +41,7 @@ export class RegistryContract {
   }
 
   async isVerified(teeHash: string, providerPublicKey: string): Promise<boolean> {
-    if (!this.queryClient) {
-      throw new AppError(
-        "Registry query client is not configured",
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        "REGISTRY_QUERY_NOT_CONFIGURED"
-      );
-    }
-
-    const result = await this.queryClient.invoke({
+    const result = await this.requireQueryClient().invoke({
       contractId: this.contractId,
       method: "is_verified",
       args: [
@@ -62,6 +54,40 @@ export class RegistryContract {
     if (typeof value !== "boolean") {
       throw new AppError(
         "Registry is_verified returned an invalid response",
+        StatusCodes.BAD_GATEWAY,
+        "REGISTRY_INVALID_RESPONSE"
+      );
+    }
+    return value;
+  }
+
+  async hasTeeHash(hash: string): Promise<boolean> {
+    const result = await this.requireQueryClient().invoke({
+      contractId: this.contractId,
+      method: "has_tee_hash",
+      args: [toBytesN32ScVal(hash, "hash")],
+    });
+    const value: unknown = scValToNative(result);
+    if (typeof value !== "boolean") {
+      throw new AppError(
+        "Registry has_tee_hash returned an invalid response",
+        StatusCodes.BAD_GATEWAY,
+        "REGISTRY_INVALID_RESPONSE"
+      );
+    }
+    return value;
+  }
+
+  async isHashVerified(hash: string): Promise<boolean> {
+    const result = await this.requireQueryClient().invoke({
+      contractId: this.contractId,
+      method: "is_hash_verified",
+      args: [toBytesN32ScVal(hash, "hash")],
+    });
+    const value: unknown = scValToNative(result);
+    if (typeof value !== "boolean") {
+      throw new AppError(
+        "Registry is_hash_verified returned an invalid response",
         StatusCodes.BAD_GATEWAY,
         "REGISTRY_INVALID_RESPONSE"
       );
@@ -83,6 +109,17 @@ export class RegistryContract {
 
   removeProvider(providerPublicKey: string): Promise<ContractTransactionResult> {
     return this.invokeMutation("remove_provider", this.providerArg(providerPublicKey));
+  }
+
+  private requireQueryClient(): ContractQueryClient {
+    if (!this.queryClient) {
+      throw new AppError(
+        "Registry query client is not configured",
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "REGISTRY_QUERY_NOT_CONFIGURED"
+      );
+    }
+    return this.queryClient;
   }
 
   private providerArg(providerPublicKey: string) {
