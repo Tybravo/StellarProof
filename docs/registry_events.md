@@ -15,7 +15,7 @@ This structured format enables clients to selectively query via Soroban's event 
 *   **Track specific registry changes:** Filter on `(Topic1 = "registry", Topic2 = "ProviderAdded")`
 
 ---
-
+### not done
 ## 1. Provider Events
 
 ### `ProviderAdded`
