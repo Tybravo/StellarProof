@@ -6,8 +6,41 @@ import { VerificationJobModel } from "../models/verificationJob.model";
 import type { AssetRequester, DeletedAssetResult } from "../types/asset.types";
 import type { PinReleaseOutcome } from "../types/ipfs.types";
 import { pinLifecycleService } from "./pinLifecycle.service";
+import type { UploadResult } from "../types/storage.types";
+import { isCidV1 } from "../utils/cid";
 
 class AssetService {
+  async createFromUpload(input: {
+    creatorId: string;
+    fileName: string;
+    upload: UploadResult;
+  }): Promise<IAsset> {
+    const { creatorId, fileName, upload } = input;
+    if (upload.provider === "ipfs" && (!upload.cid || !isCidV1(upload.cid))) {
+      throw new AppError(
+        "IPFS uploads must reference a valid CIDv1",
+        StatusCodes.BAD_GATEWAY,
+        "IPFS_CID_VERSION_MISMATCH"
+      );
+    }
+
+    const asset = new Asset({
+      creatorId: new mongoose.Types.ObjectId(creatorId),
+      fileName,
+      mimeType: upload.mimetype,
+      sizeBytes: upload.size,
+      storageProvider: upload.provider,
+      storageReferenceId: upload.provider === "ipfs" ? upload.cid : upload.url,
+      isEncrypted: false,
+    });
+    const saved = await asset.save();
+    const result = await Asset.findById(String(saved._id)).exec();
+    if (!result) {
+      throw new AppError("Created asset could not be retrieved", StatusCodes.INTERNAL_SERVER_ERROR, "DB_RETRIEVAL_FAILED");
+    }
+    return result;
+  }
+
   /**
    * Creates a new asset record in the database.
    */

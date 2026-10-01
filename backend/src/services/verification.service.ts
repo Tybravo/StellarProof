@@ -435,6 +435,7 @@ export const verificationService = {
   receiveOracleAttestation,
   advanceFromAttestationEvent,
   completeFromMintEvent,
+  verifyManifestIntegrity,
 } as const;
 
 /**

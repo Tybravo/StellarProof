@@ -42,3 +42,5 @@ export const verifyJWT = async (
     next(error);
   }
 };
+
+export const jwtMiddleware = verifyJWT;

@@ -5,6 +5,7 @@ import { AppError } from '../errors/AppError';
 import Asset from '../models/Asset.model';
 import Manifest from '../models/Manifest.model';
 import { assetService } from '../services/asset.service';
+import { contentHashService } from '../services/contentHash.service';
 import { storageOrchestratorService } from '../services/storage.service';
 import { StorageError, type StorageProvider } from '../types/storage.types';
 

@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { PinataSDK } from "pinata";
 import { StatusCodes } from "http-status-codes";
 import { env } from "../config/env";
@@ -5,7 +6,13 @@ import { AppError } from "../errors/AppError";
 import { isCidV1 } from "../utils/cid";
 import type {
   IpfsAvailability,
+  IpfsPin,
+  IpfsPinInput,
+  IpfsPinListQuery,
+  IpfsPinListResult,
+  IpfsPinResult,
   IpfsPinStatus,
+  IpfsUnpinResult,
   IpfsUploadInput,
   IpfsUploadResult,
 } from "../types/ipfs.types";
@@ -28,6 +35,40 @@ const DEFAULT_PIN_POLL_INTERVAL_MS = 500;
 const DEFAULT_PIN_POLL_TIMEOUT_MS = 6_000;
 const DEFAULT_PIN_POLL_MAX_ATTEMPTS = 8;
 const DEFAULT_AVAILABILITY_TIMEOUT_MS = 4_000;
+export const IPFS_CID_VERSION_MISMATCH = "IPFS_CID_VERSION_MISMATCH";
+export const IPFS_UPLOAD_FAILED = "IPFS_UPLOAD_FAILED";
+export const IPFS_UPLOAD_TIMEOUT = "IPFS_UPLOAD_TIMEOUT";
+export const IPFS_PIN_FAILED = "IPFS_PIN_FAILED";
+export const IPFS_UNPIN_FAILED = "IPFS_UNPIN_FAILED";
+export const IPFS_LIST_PINS_FAILED = "IPFS_LIST_PINS_FAILED";
+
+export function isValidCid(cid: string): boolean {
+  return /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(cid) || /^b[a-z2-7]{50,}$/.test(cid);
+}
+
+export function computeBackoffDelayMs(baseMs: number, attempt: number, maxMs = 30_000): number {
+  return Math.min(baseMs * 2 ** attempt, maxMs);
+}
+
+export function isRetryableUploadError(error: unknown): boolean {
+  if (!(error instanceof AppError)) return true;
+  return error.statusCode >= StatusCodes.INTERNAL_SERVER_ERROR && error.code !== IPFS_CID_VERSION_MISMATCH;
+}
+
+function withUploadTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    operation(),
+    new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new AppError("IPFS pinning timed out", StatusCodes.BAD_GATEWAY, IPFS_UPLOAD_TIMEOUT)),
+        timeoutMs,
+      );
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,6 +80,9 @@ class IpfsService {
   private readonly pinPollTimeoutMs: number;
   private readonly pinPollMaxAttempts: number;
   private readonly availabilityTimeoutMs: number;
+  private readonly uploadTimeoutMs: number;
+  private readonly uploadMaxRetries: number;
+  private readonly uploadBackoffMs: number;
 
   constructor() {
     this.pinata = new PinataSDK({
@@ -49,52 +93,68 @@ class IpfsService {
     this.pinPollTimeoutMs = env.IPFS_PIN_POLL_TIMEOUT_MS ?? DEFAULT_PIN_POLL_TIMEOUT_MS;
     this.pinPollMaxAttempts = env.IPFS_PIN_POLL_MAX_ATTEMPTS ?? DEFAULT_PIN_POLL_MAX_ATTEMPTS;
     this.availabilityTimeoutMs = env.IPFS_AVAILABILITY_TIMEOUT_MS ?? DEFAULT_AVAILABILITY_TIMEOUT_MS;
+    this.uploadTimeoutMs = env.IPFS_UPLOAD_TIMEOUT_MS;
+    this.uploadMaxRetries = env.IPFS_UPLOAD_MAX_RETRIES;
+    this.uploadBackoffMs = env.IPFS_UPLOAD_BACKOFF_MS;
+  }
+
+  async healthCheck(): Promise<void> {
+    await this.pinata.testAuthentication();
   }
 
   async upload(input: IpfsUploadInput): Promise<IpfsUploadResult> {
     const { content, name = "upload", metadata = {} } = input;
     const file = this.toFile(content, name);
+    let lastError: unknown;
 
-    return this.uploadWithRetry(file, name, metadata, content);
+    for (let attempt = 0; attempt <= this.uploadMaxRetries; attempt += 1) {
+      try {
+        return await withUploadTimeout(
+          () => this.performUpload(file, name, metadata, content),
+          this.uploadTimeoutMs,
+        );
+      } catch (error) {
+        lastError = error;
+        if (attempt === this.uploadMaxRetries || !isRetryableUploadError(error)) break;
+        await delay(computeBackoffDelayMs(this.uploadBackoffMs, attempt));
+      }
+    }
+
+    throw this.toUploadError(lastError);
   }
 
-  /**
-   * Upload the file, retrying transient failures up to
-   * `IPFS_UPLOAD_MAX_RETRIES` times with exponential backoff. Every attempt is
-   * bounded by `IPFS_UPLOAD_TIMEOUT_MS`.
-   */
-  private async uploadWithRetry(
+  private toFile(content: IpfsUploadInput["content"], name: string): File {
+    if (Buffer.isBuffer(content)) {
+      return new File([new Uint8Array(content)], name, { type: "application/octet-stream" });
+    }
+    return new File([JSON.stringify(content)], `${name}.json`, { type: "application/json" });
+  }
+
+  private async performUpload(
     file: File,
     name: string,
     metadata: Record<string, string>,
     content: IpfsUploadInput["content"],
   ): Promise<IpfsUploadResult> {
-    const maxAttempts = env.IPFS_UPLOAD_MAX_RETRIES + 1;
-    let lastError: unknown;
+    try {
+      let builder = this.pinata.upload.public.file(file).name(name).cidVersion(PINATA_CID_VERSION);
+      if (Object.keys(metadata).length > 0) builder = builder.keyvalues(metadata);
 
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
-        return await withUploadTimeout(
-          () => this.performUpload(file, name, metadata, content),
-          env.IPFS_UPLOAD_TIMEOUT_MS,
+      const response = await builder;
+      const cid = response.cid;
+      if (typeof cid !== "string" || !isCidV1(cid)) {
+        throw new AppError(
+          `IPFS upload returned a non-CIDv1 content identifier: ${String(cid)}`,
+          StatusCodes.BAD_GATEWAY,
+          IPFS_CID_VERSION_MISMATCH,
         );
-      } catch (err) {
-        lastError = err;
-
-        if (attempt === maxAttempts - 1 || !isRetryableUploadError(err)) {
-          break;
-        }
-
-        await delay(computeBackoffDelayMs(env.IPFS_UPLOAD_BACKOFF_MS, attempt));
       }
-    }
 
-      const size: number = response.size ?? (Buffer.isBuffer(content) ? content.byteLength : Buffer.byteLength(JSON.stringify(content)));
+      const size = response.size ?? (Buffer.isBuffer(content)
+        ? content.byteLength
+        : Buffer.byteLength(JSON.stringify(content)));
       const gatewayUrl = this.getGatewayUrl(cid);
       const pinId = typeof response.id === "string" ? response.id : "";
-
-      // Probe the gateway first: it doubles as the pin-state fallback for
-      // responses that do not carry a Pinata file id.
       const availability = await this.probeGatewayAvailability(cid);
       const pinningStatus = await this.resolvePinStatus(pinId, availability);
 
@@ -109,34 +169,9 @@ class IpfsService {
         pinningStatus,
         availability,
       };
-    } catch (err: unknown) {
-      if (err instanceof AppError) throw err;
-
-    const response = await builder;
-    const cid = response.cid;
-
-    if (typeof cid !== "string" || !isCidV1(cid)) {
-      throw new AppError(
-        `IPFS upload returned a non-CIDv1 content identifier: ${String(cid)}`,
-        StatusCodes.BAD_GATEWAY,
-        IPFS_CID_VERSION_MISMATCH,
-      );
+    } catch (error) {
+      throw this.toUploadError(error);
     }
-
-    const size: number =
-      response.size ??
-      (Buffer.isBuffer(content)
-        ? content.byteLength
-        : Buffer.byteLength(JSON.stringify(content)));
-
-    return {
-      cid,
-      cidVersion: 1,
-      size,
-      name: response.name ?? name,
-      timestamp: new Date().toISOString(),
-      gatewayUrl: `${env.PINATA_GATEWAY_URL}/${cid}`,
-    };
   }
 
   /**
@@ -208,6 +243,10 @@ class IpfsService {
     }
   }
 
+  getGatewayUrl(cid: string): string {
+    return `${env.PINATA_GATEWAY_URL.replace(/\/+$/, "")}/${cid}`;
+  }
+
   /**
    * Stream a CID from the Pinata gateway and compute its SHA-256.
    * The whole request (headers + body) is bounded by `timeoutMs`, and the
@@ -219,7 +258,122 @@ class IpfsService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeoutMs);
 
-    return new File([JSON.stringify(content)], `${name}.json`, { type: "application/json" });
+    try {
+      const response = await fetch(this.getGatewayUrl(cid), {
+        method: "GET",
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      if (response.status === StatusCodes.NOT_FOUND || response.status === StatusCodes.GONE) {
+        await response.body?.cancel();
+        return { status: "not_found", httpStatus: response.status };
+      }
+      if (!response.ok || !response.body) {
+        await response.body?.cancel();
+        return { status: "unreachable", httpStatus: response.status };
+      }
+
+      const contentLength = response.headers.get("content-length");
+      const declaredSize = contentLength && /^\d+$/.test(contentLength) ? Number(contentLength) : null;
+      if (declaredSize !== null && declaredSize > options.maxBytes) {
+        await response.body.cancel();
+        return { status: "too_large", declaredSize };
+      }
+
+      const hash = createHash("sha256");
+      const reader = response.body.getReader();
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (received > options.maxBytes) {
+          await reader.cancel();
+          return { status: "too_large", declaredSize };
+        }
+        hash.update(value);
+      }
+      return { status: "ok", size: received, sha256: hash.digest("hex") };
+    } catch {
+      return controller.signal.aborted ? { status: "timeout" } : { status: "unreachable" };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async pinMedia(input: IpfsPinInput): Promise<IpfsPinResult> {
+    if (!isValidCid(input.cid)) {
+      throw new AppError(`Invalid IPFS CID: ${input.cid}`, StatusCodes.BAD_REQUEST, "INVALID_CID");
+    }
+    try {
+      let builder = this.pinata.upload.public.cid(input.cid).name(input.name ?? input.cid);
+      if (input.metadata && Object.keys(input.metadata).length > 0) builder = builder.keyvalues(input.metadata);
+      const result = await builder;
+      return {
+        id: result.id,
+        cid: result.cid,
+        name: result.name ?? input.name ?? input.cid,
+        status: result.status,
+        queuedAt: result.date_queued,
+      };
+    } catch (error) {
+      throw this.toLifecycleError(error, IPFS_PIN_FAILED, "pin");
+    }
+  }
+
+  async listPins(query: IpfsPinListQuery = {}): Promise<IpfsPinListResult> {
+    const limit = query.limit ?? 50;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      throw new AppError("Pin list limit must be between 1 and 1000", StatusCodes.BAD_REQUEST, "INVALID_PIN_LIST_LIMIT");
+    }
+    try {
+      let builder = this.pinata.files.public.list().order("DESC").limit(limit);
+      if (query.pageToken) builder = builder.pageToken(query.pageToken);
+      if (query.cid) builder = builder.cid(query.cid);
+      const page = await builder;
+      return {
+        pins: (page.files ?? []).map((file): IpfsPin => ({
+          id: file.id,
+          cid: file.cid,
+          name: file.name ?? null,
+          size: file.size,
+          mimeType: file.mime_type,
+          keyvalues: file.keyvalues ?? {},
+          createdAt: file.created_at,
+        })),
+        nextPageToken: page.next_page_token || null,
+      };
+    } catch (error) {
+      throw this.toLifecycleError(error, IPFS_LIST_PINS_FAILED, "list pins");
+    }
+  }
+
+  async unpinCid(cid: string): Promise<IpfsUnpinResult> {
+    if (!isValidCid(cid)) {
+      throw new AppError(`Invalid IPFS CID: ${cid}`, StatusCodes.BAD_REQUEST, "INVALID_CID");
+    }
+    try {
+      const pins = await this.pinata.files.public.list().cid(cid).all();
+      const fileIds = pins.map((pin) => pin.id);
+      if (fileIds.length === 0) return { cid, unpinned: false, fileIds: [] };
+
+      const results = await this.pinata.files.public.delete(fileIds);
+      const failures = results.filter((result) => result.status !== "OK");
+      const remaining = await this.pinata.files.public.list().cid(cid).all();
+      if (failures.length > 0 || remaining.length > 0) {
+        const details = failures.map((result) => `${result.id} (${result.status})`).join(", ");
+        throw new Error(`Could not unpin ${remaining.length || failures.length} of ${fileIds.length}${details ? `: ${details}` : ""}`);
+      }
+      return { cid, unpinned: true, fileIds };
+    } catch (error) {
+      throw this.toLifecycleError(error, IPFS_UNPIN_FAILED, "unpin");
+    }
+  }
+
+  private toLifecycleError(error: unknown, code: string, operation: string): AppError {
+    if (error instanceof AppError) return error;
+    const message = error instanceof Error ? error.message : String(error);
+    return new AppError(`IPFS ${operation} failed: ${message}`, StatusCodes.BAD_GATEWAY, code);
   }
 
   /** Preserve typed AppErrors; wrap everything else as a 502 upload failure. */
@@ -227,7 +381,8 @@ class IpfsService {
     if (error instanceof AppError) return error;
 
     const message = error instanceof Error ? error.message : "IPFS upload failed — unknown error";
-    return new AppError(`IPFS upload failed: ${message}`, StatusCodes.BAD_GATEWAY, IPFS_UPLOAD_FAILED);
+    const code = message.toLowerCase().includes("timed out") ? IPFS_UPLOAD_TIMEOUT : IPFS_UPLOAD_FAILED;
+    return new AppError(`IPFS upload failed: ${message}`, StatusCodes.BAD_GATEWAY, code);
   }
   
   async fetchManifestJson(cidOrUrl: string): Promise<Record<string, any>> {

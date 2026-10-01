@@ -17,9 +17,11 @@ export interface IStorageRecord extends Document {
   publicId?: string;         // Cloudinary Public ID
   contentHash?: string;      // SHA-256 (hex) of the uploaded bytes
   fallbackFrom?: StorageProvider; // Requested provider when the upload fell back to `provider`
+  requestedProvider?: StorageProvider;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
   size: number;              // File size in bytes
   mimetype: string;          // MIME type (e.g., image/png)
-  contentHash?: string;      // SHA-256 hex of the stored bytes (server-computed)
   originalFilename: string;  // Original uploaded filename
   uploadedAt: Date;
   // IPFS only: pin propagation state and gateway reachability captured at upload time.
@@ -77,10 +79,22 @@ const StorageRecordSchema: Schema = new Schema(
       type: String,
       lowercase: true,
       match: [/^[a-f0-9]{64}$/, 'contentHash must be a SHA-256 hex digest'],
+      index: true,
     },
     fallbackFrom: {
       type: String,
       enum: ['cloudinary', 'ipfs'],
+    },
+    requestedProvider: {
+      type: String,
+      enum: ['cloudinary', 'ipfs'],
+    },
+    fallbackUsed: {
+      type: Boolean,
+    },
+    fallbackReason: {
+      type: String,
+      maxlength: 1000,
     },
     size: {
       type: Number,
@@ -89,12 +103,6 @@ const StorageRecordSchema: Schema = new Schema(
     mimetype: {
       type: String,
       required: [true, 'MIME type is required'],
-    },
-    contentHash: {
-      type: String,
-      lowercase: true,
-      match: [/^[a-f0-9]{64}$/, 'contentHash must be a SHA-256 hex digest'],
-      index: true,
     },
     originalFilename: {
       type: String,

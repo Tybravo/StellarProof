@@ -32,6 +32,17 @@ function optionalPositiveIntEnv(key: string, fallback: number): number {
   return value;
 }
 
+function optionalNonNegativeIntEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    console.error(`[Config] ${key} must be a non-negative integer, got "${raw}"`);
+    process.exit(1);
+  }
+  return value;
+}
+
 function rpcUrlList(): string[] {
   return Array.from(
     new Set(
@@ -67,9 +78,6 @@ export const env = {
   /** How long an open circuit stays open before a half-open trial (ms). */
   STELLAR_RPC_COOLDOWN_MS: parseInt(optionalEnv("STELLAR_RPC_COOLDOWN_MS", "30000"), 10),
 
-  /** Per-request timeout for RPC calls (ms). */
-  STELLAR_RPC_TIMEOUT_MS: parseInt(optionalEnv("STELLAR_RPC_TIMEOUT_MS", "10000"), 10),
-
   /**
    * Network passphrase used when building simulation transactions.
    * Testnet: "Test SDF Network ; September 2015"
@@ -100,6 +108,18 @@ export const env = {
     "STELLAR_TX_CONFIRMATION_TIMEOUT_MS",
     120_000
   ),
+  STELLAR_RPC_TIMEOUT_MS: optionalPositiveIntEnv("STELLAR_RPC_TIMEOUT_MS", 30_000),
+  STELLAR_TX_POLL_INTERVAL_MS: optionalPositiveIntEnv("STELLAR_TX_POLL_INTERVAL_MS", 1_000),
+  STELLAR_TX_MAX_CONSECUTIVE_RPC_ERRORS: optionalPositiveIntEnv("STELLAR_TX_MAX_CONSECUTIVE_RPC_ERRORS", 3),
+  ORACLE_CODE_MEASUREMENT_HASH: optionalEnv("ORACLE_CODE_MEASUREMENT_HASH", ""),
+  VERIFICATION_WORKER_POLL_INTERVAL_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_POLL_INTERVAL_MS", 5_000),
+  VERIFICATION_WORKER_BATCH_SIZE: optionalPositiveIntEnv("VERIFICATION_WORKER_BATCH_SIZE", 10),
+  VERIFICATION_WORKER_MAX_ATTEMPTS: optionalPositiveIntEnv("VERIFICATION_WORKER_MAX_ATTEMPTS", 5),
+  VERIFICATION_WORKER_RETRY_BASE_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_RETRY_BASE_MS", 1_000),
+  VERIFICATION_WORKER_LEASE_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_LEASE_MS", 300_000),
+  SPV_FETCH_TIMEOUT_MS: optionalPositiveIntEnv("SPV_FETCH_TIMEOUT_MS", 30_000),
+  SPV_MAX_MEDIA_BYTES: optionalPositiveIntEnv("SPV_MAX_MEDIA_BYTES", 100 * 1024 * 1024),
+  SPV_MAX_MANIFEST_BYTES: optionalPositiveIntEnv("SPV_MAX_MANIFEST_BYTES", 5 * 1024 * 1024),
 
   /** Allowed CORS origin for the frontend. */
   CORS_ORIGIN: optionalEnv("CORS_ORIGIN", "http://localhost:3000"),
@@ -150,6 +170,11 @@ export const env = {
 
   /** Max bytes downloaded from the IPFS gateway when resolving a CID (defaults to the 100 MB upload limit) */
   IPFS_RESOLVE_MAX_BYTES: optionalPositiveIntEnv("IPFS_RESOLVE_MAX_BYTES", 100 * 1024 * 1024),
+
+  /** Preferred storage provider order and shared health-check cache settings. */
+  STORAGE_PROVIDER_PRIORITY: optionalEnv("STORAGE_PROVIDER_PRIORITY", "ipfs,cloudinary"),
+  STORAGE_HEALTH_TTL_MS: optionalPositiveIntEnv("STORAGE_HEALTH_TTL_MS", 60_000),
+  STORAGE_HEALTH_CHECK_TIMEOUT_MS: optionalPositiveIntEnv("STORAGE_HEALTH_CHECK_TIMEOUT_MS", 5_000),
 
   /** Per-attempt timeout (ms) for a single IPFS upload request */
   IPFS_UPLOAD_TIMEOUT_MS: optionalPositiveIntEnv("IPFS_UPLOAD_TIMEOUT_MS", 30_000),

@@ -29,11 +29,7 @@ router.post(
 
 router.get(
   '/jobs/:id/stream',
-  protect,
-  validateParams(z.object({
-    id: z.string().regex(MONGO_OBJECT_ID_REGEX, "id must be a valid MongoDB ObjectId"),
-  })),
-  requireJobOwnership,
+  validateParams(z.object({ id: z.string().regex(MONGO_OBJECT_ID_REGEX, "id must be a valid MongoDB ObjectId") })),
   verificationController.subscribe.bind(verificationController)
 );
 

@@ -3,8 +3,23 @@
  * All storage-related types are defined here for consistency
  */
 import type { IpfsAvailability, IpfsPinStatus } from './ipfs.types';
+import { AppError } from '../errors/AppError';
 
 export type StorageProvider = 'cloudinary' | 'ipfs';
+export const STORAGE_PROVIDERS: readonly StorageProvider[] = ['ipfs', 'cloudinary'];
+export type ProviderHealthStatus = 'healthy' | 'unhealthy';
+
+export interface ProviderHealthSnapshot {
+  provider: StorageProvider;
+  rank: number;
+  status: ProviderHealthStatus;
+  latencyMs?: number;
+  consecutiveFailures: number;
+  lastError?: string;
+  lastCheckedAt: Date;
+  lastHealthyAt?: Date;
+  source: 'probe' | 'upload';
+}
 
 /** What a stored object represents: raw media bytes or a provenance manifest */
 export type StorageRecordKind = 'media' | 'manifest';
@@ -16,12 +31,18 @@ export interface UploadRequest {
   originalname: string;
   userId: string;
   contentHash?: string;  // Verified SHA-256 hex; computed from the buffer when omitted
+  assetId?: string;
+  kind?: StorageRecordKind;
+  metadata?: Record<string, string>;
+  allowFallback?: boolean;
 }
 
 export interface UploadResult {
+  recordId?: string;
   provider: StorageProvider;          // Provider that actually stored the file
-  requestedProvider: StorageProvider; // Provider the client asked for
-  fallbackUsed: boolean;              // True when the requested provider failed and a fallback stored the file
+  requestedProvider?: StorageProvider; // Provider the client asked for
+  fallbackUsed?: boolean;              // True when the requested provider failed and a fallback stored the file
+  failedOver?: boolean;
   url: string;
   cid?: string;          // IPFS only
   publicId?: string;     // Cloudinary only

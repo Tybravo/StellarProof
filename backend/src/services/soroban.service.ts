@@ -10,6 +10,8 @@ import { StatusCodes } from "http-status-codes";
 import { env } from "../config/env";
 import { AppError } from "../errors/AppError";
 import logger from "../utils/logger";
+import RpcFailoverEvent from "../models/RpcFailoverEvent.model";
+import type { RpcEndpointStatus, RpcFailoverOptions, RpcNetworkStatus } from "../types/soroban.types";
 
 /**
  * Soroban RPC Service
@@ -23,6 +25,7 @@ import logger from "../utils/logger";
 export type SorobanOperation =
   | "loadAccount"
   | "getEvents"
+  | "getLatestLedger"
   | "simulate"
   | "sendTransaction"
   | "getTransaction";
@@ -64,6 +67,149 @@ const TRANSACTION_HASH_PATTERN = /^[0-9a-f]{64}$/i;
 
 const JSON_RPC_INVALID_REQUEST = -32600;
 const JSON_RPC_INVALID_PARAMS = -32602;
+
+export function redactEndpoint(endpoint: string): string {
+  try {
+    return new URL(endpoint).origin;
+  } catch {
+    return "[invalid-url]";
+  }
+}
+
+export function isRpcNetworkError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const value = error as { isAxiosError?: boolean; code?: unknown; response?: { status?: number }; message?: unknown };
+  if (value.isAxiosError) {
+    const status = value.response?.status;
+    return status === undefined || status === 429 || status >= 500;
+  }
+  return typeof value.code === "string" && [
+    "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH", "EAI_AGAIN",
+  ].includes(value.code);
+}
+
+interface RpcEndpoint {
+  url: string;
+  server: rpc.Server;
+  state: "closed" | "open" | "half_open";
+  consecutiveFailures: number;
+  openedAt?: Date;
+  retryAt?: Date;
+  lastError?: string;
+}
+
+export class RpcFailover {
+  private readonly endpoints: RpcEndpoint[];
+
+  constructor(
+    urls: string[],
+    private readonly options: RpcFailoverOptions,
+    serverFactory: (url: string) => rpc.Server = (url) =>
+      new rpc.Server(url, { allowHttp: options.allowHttp, timeout: options.timeoutMs }),
+  ) {
+    this.endpoints = [];
+    for (const url of urls) {
+      try {
+        if (!options.allowHttp && url.startsWith("http://")) continue;
+        this.endpoints.push({
+          url,
+          server: serverFactory(url),
+          state: "closed",
+          consecutiveFailures: 0,
+        });
+      } catch {
+        // A malformed endpoint must not prevent healthy endpoints from starting.
+      }
+    }
+  }
+
+  getEndpointStatuses(): RpcEndpointStatus[] {
+    this.refreshHalfOpenStates();
+    return this.endpoints.map((endpoint, index) => ({
+      priority: index + 1,
+      endpoint: redactEndpoint(endpoint.url),
+      state: endpoint.state,
+      consecutiveFailures: endpoint.consecutiveFailures,
+      ...(endpoint.openedAt ? { openedAt: endpoint.openedAt } : {}),
+      ...(endpoint.retryAt ? { retryAt: endpoint.retryAt } : {}),
+      ...(endpoint.lastError ? { lastError: endpoint.lastError } : {}),
+    }));
+  }
+
+  getActiveEndpoint(): string | null {
+    this.refreshHalfOpenStates();
+    const endpoint = this.endpoints.find((candidate) => candidate.state !== "open");
+    return endpoint ? redactEndpoint(endpoint.url) : null;
+  }
+
+  async execute<T>(operation: string, call: (server: rpc.Server) => Promise<T>): Promise<T> {
+    this.refreshHalfOpenStates();
+    const candidates = this.endpoints.filter((endpoint) => endpoint.state !== "open");
+    if (candidates.length === 0) {
+      throw new AppError("All Stellar RPC endpoints are unavailable", StatusCodes.SERVICE_UNAVAILABLE, "RPC_UNAVAILABLE");
+    }
+
+    let lastError: unknown;
+    for (let index = 0; index < candidates.length; index += 1) {
+      const endpoint = candidates[index];
+      try {
+        const result = await call(endpoint.server);
+        endpoint.state = "closed";
+        endpoint.consecutiveFailures = 0;
+        endpoint.openedAt = undefined;
+        endpoint.retryAt = undefined;
+        endpoint.lastError = undefined;
+        return result;
+      } catch (error) {
+        if (!isRpcNetworkError(error)) throw error;
+        lastError = error;
+        endpoint.consecutiveFailures += 1;
+        endpoint.lastError = error instanceof Error ? error.message : String(error);
+        const circuitOpened = endpoint.state === "half_open" ||
+          endpoint.consecutiveFailures >= this.options.failureThreshold;
+        if (circuitOpened) {
+          endpoint.state = "open";
+          endpoint.openedAt = new Date(Date.now());
+          endpoint.retryAt = new Date(Date.now() + this.options.cooldownMs);
+        }
+
+        const event = {
+          operation,
+          fromEndpoint: redactEndpoint(endpoint.url),
+          ...(candidates[index + 1] ? { toEndpoint: redactEndpoint(candidates[index + 1].url) } : {}),
+          reason: endpoint.lastError,
+          ...(typeof (error as { code?: unknown })?.code === "string"
+            ? { errorCode: String((error as { code: string }).code) }
+            : typeof (error as { response?: { status?: number } })?.response?.status === "number"
+              ? { errorCode: `HTTP_${(error as { response: { status: number } }).response.status}` }
+              : {}),
+          circuitOpened,
+        };
+        logger.warn("Stellar RPC failover", { event: "rpc_failover", ...event });
+        void RpcFailoverEvent.create(event).catch((auditError: unknown) => {
+          logger.error("Failed to persist RPC failover event", {
+            error: auditError instanceof Error ? auditError.message : String(auditError),
+          });
+        });
+      }
+    }
+
+    throw new AppError(
+      `All Stellar RPC endpoints failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      StatusCodes.BAD_GATEWAY,
+      "RPC_ALL_ENDPOINTS_FAILED",
+    );
+  }
+
+  private refreshHalfOpenStates(): void {
+    const now = Date.now();
+    for (const endpoint of this.endpoints) {
+      if (endpoint.state === "open" && endpoint.retryAt && now >= endpoint.retryAt.getTime()) {
+        endpoint.state = "half_open";
+      }
+    }
+  }
+}
 
 class SorobanRpcTimeoutError extends Error {
   constructor(public readonly timeoutMs: number) {
@@ -141,6 +287,36 @@ export class SorobanService {
   /** Fetch contract / system / diagnostic events. */
   async getEvents(request: rpc.Server.GetEventsRequest): Promise<rpc.Api.GetEventsResponse> {
     return this.call("getEvents", () => this.server.getEvents(request));
+  }
+
+  async getNetworkStatus(limit = 20): Promise<RpcNetworkStatus> {
+    const [ledger, failovers] = await Promise.all([
+      this.call("getLatestLedger", () => this.server.getLatestLedger()),
+      RpcFailoverEvent.find().sort({ occurredAt: -1 }).limit(limit).lean().exec(),
+    ]);
+    return {
+      activeEndpoint: redactEndpoint(env.STELLAR_RPC_URL),
+      latestLedger: {
+        sequence: ledger.sequence,
+        protocolVersion: String(ledger.protocolVersion),
+        id: ledger.id,
+      },
+      endpoints: (env.STELLAR_RPC_URLS ?? [env.STELLAR_RPC_URL]).map((url, index) => ({
+        priority: index + 1,
+        endpoint: redactEndpoint(url),
+        state: "closed" as const,
+        consecutiveFailures: 0,
+      })),
+      recentFailovers: failovers.map((event) => ({
+        operation: event.operation,
+        fromEndpoint: event.fromEndpoint,
+        toEndpoint: event.toEndpoint,
+        reason: event.reason,
+        errorCode: event.errorCode,
+        circuitOpened: event.circuitOpened,
+        occurredAt: event.occurredAt,
+      })),
+    };
   }
 
   /**
