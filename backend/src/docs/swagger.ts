@@ -65,6 +65,45 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        VerificationJob: {
+          type: 'object',
+          required: [ 'ownerPublicKey', 'contentHash', 'status' ],
+          properties: {
+            _id: { type: 'string', example: '665f1f0d8f1d4d3a4f2d7c10' },
+            ownerPublicKey: { type: 'string', example: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF' },
+            contentHash: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+            status: { type: 'string', enum: [ 'pending', 'processing', 'tee_verifying', 'minting', 'completed', 'failed' ] },
+            errorMessage: { type: 'string' },
+            timeline: { type: 'array', items: { type: 'object', properties: { stage: { type: 'string' }, at: { type: 'string', format: 'date-time' } } } },
+          },
+        },
+        VerificationJobCreate: {
+          type: 'object', required: [ 'ownerPublicKey', 'contentHash' ],
+          properties: {
+            ownerPublicKey: { type: 'string', description: 'Stellar G-address' },
+            contentHash: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+            webhookUrl: { type: 'string', format: 'uri' },
+          },
+        },
+        VerificationStatusUpdate: {
+          type: 'object', required: [ 'status' ],
+          properties: {
+            status: { type: 'string', enum: [ 'processing', 'tee_verifying', 'minting', 'completed', 'failed' ] },
+            errorMessage: { type: 'string' },
+            teeAttestationHash: { type: 'string' },
+            teeSignature: { type: 'string' },
+            codeMeasurementHash: { type: 'string' },
+            stellarTransactionHash: { type: 'string' },
+          },
+        },
+        OracleCallback: {
+          type: 'object', required: [ 'jobId', 'teeAttestationHash', 'teeSignature' ],
+          properties: {
+            jobId: { type: 'string' },
+            teeAttestationHash: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' },
+            teeSignature: { type: 'string' },
+          },
+        },
       },
     },
   },
@@ -91,4 +130,3 @@ export function setupSwagger(app: Express): void {
 
   console.log('📚 Swagger docs available at "http://localhost:4000/api-docs"');
 }
-
