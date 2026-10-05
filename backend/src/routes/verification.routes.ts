@@ -153,6 +153,80 @@ function validateListQuery(req: Request, res: Response, next: NextFunction): voi
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/v1/verification/jobs:
+ *   post:
+ *     summary: Create a verification job
+ *     tags: [Verification]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json: { schema: { $ref: '#/components/schemas/VerificationJobCreate' } }
+ *     responses:
+ *       201: { description: Job created, content: { application/json: { schema: { $ref: '#/components/schemas/VerificationJob' } } } }
+ *       400: { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+ *   get:
+ *     summary: List the authenticated owner's verification jobs
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string } }
+ *       - { in: query, name: dateFrom, schema: { type: string, format: date-time } }
+ *       - { in: query, name: dateTo, schema: { type: string, format: date-time } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: skip, schema: { type: integer, minimum: 0, default: 0 } }
+ *     responses:
+ *       200: { description: Job page }
+ *       401: { description: Authentication required }
+ * /api/v1/verification/jobs/stats:
+ *   get:
+ *     summary: Get verification status counts and trends
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Verification statistics }
+ * /api/v1/verification/jobs/{id}:
+ *   get:
+ *     summary: Retrieve one verification job
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     responses:
+ *       200: { description: Verification job }
+ *       404: { description: Job not found }
+ * /api/v1/verification/jobs/{id}/status:
+ *   patch:
+ *     summary: Advance a verification job through its state machine
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     requestBody:
+ *       required: true
+ *       content: { application/json: { schema: { $ref: '#/components/schemas/VerificationStatusUpdate' } } }
+ *     responses:
+ *       200: { description: Updated job }
+ *       400: { description: Invalid transition or payload }
+ * /api/v1/verification/jobs/oracle/callback:
+ *   post:
+ *     summary: Accept a signed oracle attestation callback
+ *     tags: [Verification]
+ *     requestBody:
+ *       required: true
+ *       content: { application/json: { schema: { $ref: '#/components/schemas/OracleCallback' } } }
+ *     responses:
+ *       200: { description: Attestation accepted }
+ *       401: { description: Invalid oracle credential }
+ * /api/v1/verification/jobs/{id}/stream:
+ *   get:
+ *     summary: Stream verification status changes using SSE
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+ *     responses:
+ *       200: { description: text/event-stream status updates }
+ */
+
 router.post(
   "/",
   validateBody(createJobSchema),

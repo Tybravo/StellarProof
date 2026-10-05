@@ -18,6 +18,28 @@ const oracleCallbackSchema = z.object({
   teeSignature: z.string().min(1, "teeSignature is required"),
 });
 
+/**
+ * @swagger
+ * /api/v1/verify/submit:
+ *   post:
+ *     summary: Submit a manifest and asset for verification
+ *     tags: [Verification]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [manifestId, assetId]
+ *             properties:
+ *               manifestId: { type: string }
+ *               assetId: { type: string }
+ *     responses:
+ *       201: { description: Verification job submitted }
+ *       400: { description: Invalid manifest or asset identifier }
+ *       403: { description: Authenticated user does not own both resources }
+ */
 router.post('/submit', protect, verificationController.submit.bind(verificationController));
 
 router.post(
