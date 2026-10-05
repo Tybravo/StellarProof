@@ -222,6 +222,57 @@ async function retryJob(id: string, requester: VerificationJobAccessContext): Pr
   }
 }
 
+async function listJobs(query: ListVerificationJobsQuery): Promise<ListVerificationJobsResult> {
+  const filter: any = {};
+  
+  if (query.status) {
+    filter.status = query.status;
+  }
+  
+  if (query.ownerPublicKey) {
+    filter.ownerPublicKey = query.ownerPublicKey;
+  }
+
+  const jobs = await VerificationJobModel.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(query.limit || 50)
+    .skip(query.offset || 0)
+    .lean<IVerificationJob[]>();
+
+  const total = await VerificationJobModel.countDocuments(filter);
+
+  return {
+    jobs,
+    total,
+    limit: query.limit || 50,
+    offset: query.offset || 0,
+  };
+}
+
+async function getJobStats(): Promise<JobStats> {
+  const statusCounts = await VerificationJobModel.aggregate([
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ]);
+
+  const counts: JobStatusCounts = Object.fromEntries(
+    Object.values(VerificationStatus).map(status => [status, 0])
+  );
+
+  statusCounts.forEach(({ _id, count }) => {
+    if (_id && _id in counts) {
+      counts[_id as VerificationStatus] = count;
+    }
+  });
+
+  // Simple trend data - could be enhanced with time buckets
+  const trends: JobTrendBucket[] = [];
+
+  return {
+    counts,
+    trends,
+  };
+}
+
 async function updateJobStatus(
   id: string,
   dto: UpdateVerificationStatusDTO,
@@ -426,6 +477,13 @@ export const verificationService = {
   completeFromMintEvent,
   getJobTimeline,
   retryJob,
+  verifyManifestIntegrity,
+  getPendingJobsWithManifest: async (): Promise<IVerificationJob[]> => {
+    return VerificationJobModel.find({
+      status: VerificationStatus.PENDING,
+      manifestId: { $exists: true, $ne: null },
+    }).lean<IVerificationJob[]>();
+  },
   failStaleJobs: async (cutoff: Date): Promise<number> => {
     const staleJobs = await VerificationJobModel.find({
       status: { $in: [VerificationStatus.TEE_VERIFYING, VerificationStatus.MINTING] },
