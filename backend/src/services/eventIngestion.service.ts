@@ -1,4 +1,4 @@
-import { scValToNative, StrKey, type rpc } from "@stellar/stellar-sdk";
+import { scValToNative, StrKey, xdr, type rpc } from "@stellar/stellar-sdk";
 import { StatusCodes } from "http-status-codes";
 import { AppError } from "../errors/AppError";
 import { EventIngestionCursorModel } from "../models/EventIngestionCursor.model";
@@ -6,8 +6,25 @@ import logger from "../utils/logger";
 import type { SorobanService } from "./soroban.service";
 import { verificationService } from "./verification.service";
 import { mintService } from "./mint.service";
+import {
+  sorobanEventBus,
+  type IngestedSorobanEvent,
+  type SorobanEventBus,
+} from "./sorobanEventBus.service";
 
 const STREAM = "oracle-provenance-events";
+
+const TOPIC_VERIFICATION_REQUEST = xdr.ScVal.scvSymbol("VerificationRequest").toXDR("base64");
+const TOPIC_ATTESTATION = xdr.ScVal.scvSymbol("Attestation").toXDR("base64");
+const TOPIC_ATTESTED = xdr.ScVal.scvSymbol("Attested").toXDR("base64");
+const TOPIC_CERTIFICATE_MINTED = xdr.ScVal.scvSymbol("CertificateMinted").toXDR("base64");
+const TOPIC_REGISTRY = xdr.ScVal.scvSymbol("registry").toXDR("base64");
+const TOPIC_TEE_HASH_ADDED = xdr.ScVal.scvSymbol("TeeHashAdded").toXDR("base64");
+const TOPIC_TEE_HASH_REMOVED = xdr.ScVal.scvSymbol("TeeHashRemoved").toXDR("base64");
+const TOPIC_PROVIDER_ADDED = xdr.ScVal.scvSymbol("ProviderAdded").toXDR("base64");
+const TOPIC_PROVIDER_REMOVED = xdr.ScVal.scvSymbol("ProviderRemoved").toXDR("base64");
+
+let defaultSubscriberRegistered = false;
 
 interface EventCursorStore {
   get(): Promise<{ cursor: string; latestLedger: number } | null>;
@@ -40,6 +57,7 @@ interface EventMintService {
 export interface EventIngestionConfig {
   oracleContractId: string;
   provenanceContractId: string;
+  registryContractId: string;
   startLedger?: number;
   limit: number;
 }
@@ -78,7 +96,17 @@ function eventName(event: rpc.Api.EventResponse): string | undefined {
     .map((topic) => stringValue(scValToNative(topic)))
     .find((topic) => {
       const normalized = topic?.toLowerCase();
-      return normalized === "attestation" || normalized === "attested" || normalized === "certificateminted";
+      return (
+        normalized === "verificationrequest" ||
+        normalized === "verification_request" ||
+        normalized === "attestation" ||
+        normalized === "attested" ||
+        normalized === "certificateminted" ||
+        normalized === "teehashadded" ||
+        normalized === "teehashremoved" ||
+        normalized === "provideradded" ||
+        normalized === "providerremoved"
+      );
     });
 }
 
@@ -88,11 +116,16 @@ export class EventIngestionService {
     private readonly jobs: EventJobService,
     private readonly cursors: EventCursorStore,
     private readonly config: EventIngestionConfig,
-    private readonly minter?: EventMintService
+    private readonly minter?: EventMintService,
+    private readonly bus: SorobanEventBus = sorobanEventBus
   ) {
-    if (!StrKey.isValidContract(config.oracleContractId) || !StrKey.isValidContract(config.provenanceContractId)) {
+    if (
+      !StrKey.isValidContract(config.oracleContractId) ||
+      !StrKey.isValidContract(config.provenanceContractId) ||
+      !StrKey.isValidContract(config.registryContractId)
+    ) {
       throw new AppError(
-        "Oracle and Provenance contract IDs must be valid contract addresses",
+        "Oracle, Provenance, and Registry contract IDs must be valid contract addresses",
         StatusCodes.INTERNAL_SERVER_ERROR,
         "EVENT_INGESTION_CONFIG_INVALID"
       );
@@ -106,8 +139,35 @@ export class EventIngestionService {
     const saved = await this.cursors.get();
     const response = await this.rpcClient.getEvents({
       filters: [
-        { type: "contract", contractIds: [this.config.oracleContractId] },
-        { type: "contract", contractIds: [this.config.provenanceContractId] },
+        {
+          type: "contract",
+          contractIds: [this.config.oracleContractId],
+          // Keep the existing attestation compatibility while adding the
+          // VerificationRequest topic required by #684.
+          topics: [
+            [TOPIC_VERIFICATION_REQUEST],
+            [TOPIC_ATTESTATION],
+            [TOPIC_ATTESTED],
+          ],
+        },
+        {
+          type: "contract",
+          contractIds: [this.config.provenanceContractId],
+          topics: [[TOPIC_CERTIFICATE_MINTED]],
+        },
+        {
+          type: "contract",
+          contractIds: [this.config.registryContractId],
+          // Registry events are published as ("registry", EventName, ...).
+          // Keep the filter exact so every fetched event is one this decoder
+          // understands and can advance past durably.
+          topics: [
+            [TOPIC_REGISTRY, TOPIC_TEE_HASH_ADDED],
+            [TOPIC_REGISTRY, TOPIC_TEE_HASH_REMOVED],
+            [TOPIC_REGISTRY, TOPIC_PROVIDER_ADDED],
+            [TOPIC_REGISTRY, TOPIC_PROVIDER_REMOVED],
+          ],
+        },
       ],
       limit: this.config.limit,
       ...(saved?.cursor
@@ -130,32 +190,18 @@ export class EventIngestionService {
         field(payload, "request_id", "requestId") ??
         (name === "certificateminted" ? undefined : this.topicRequestId(event));
 
-      const job = name === "certificateminted"
-        ? await this.jobs.completeFromMintEvent({
-            manifestHash,
-            requestId,
-            certificateId: field(payload, "certificate_id", "certificateId") ?? this.topicCertificateId(event),
-            transactionHash: event.txHash,
-          })
-        : await this.jobs.advanceFromAttestationEvent({
-            manifestHash,
-            requestId,
-            attestationHash: field(payload, "attestation_hash", "attestationHash"),
-            transactionHash: event.txHash,
-          });
+      const decoded = this.decodeEvent(event, name, payload, manifestHash, requestId);
+      const handled = await this.bus.publish(decoded);
+      correlated += handled;
 
-      if (job) {
-        correlated += 1;
-        if (name !== "certificateminted" && this.minter && job._id) {
-          await this.minter.mintForJob(String(job._id));
-        }
+      if (handled === 0 && decoded.kind !== "registry") {
+        logger.warn("Soroban event did not match a verification job", {
+          eventId: event.id,
+          eventName: name,
+          manifestHash,
+          requestId,
+        });
       }
-      else logger.warn("Soroban event did not match a verification job", {
-        eventId: event.id,
-        eventName: name,
-        manifestHash,
-        requestId,
-      });
 
       await this.cursors.save(event.pagingToken, event.ledger);
     }
@@ -170,6 +216,70 @@ export class EventIngestionService {
       correlated,
       latestLedger: response.latestLedger,
       cursor: response.cursor,
+    };
+  }
+
+  private decodeEvent(
+    event: rpc.Api.EventResponse,
+    name: string,
+    payload: Record<string, unknown>,
+    manifestHash: string | undefined,
+    requestId: string | undefined
+  ): IngestedSorobanEvent {
+    if (name === "verificationrequest" || name === "verification_request") {
+      return {
+        kind: "verificationRequest",
+        eventId: event.id,
+        ledger: event.ledger,
+        transactionHash: event.txHash,
+        requestId:
+          field(payload, "request_id", "requestId", "id") ??
+          this.topicRequestId(event),
+        contentHash:
+          field(payload, "content_hash", "contentHash") ??
+          this.topicManifestHash(event),
+        state: field(payload, "state"),
+      };
+    }
+
+    if (name === "certificateminted") {
+      return {
+        kind: "certificateMinted",
+        eventId: event.id,
+        ledger: event.ledger,
+        transactionHash: event.txHash,
+        manifestHash,
+        requestId,
+        certificateId:
+          field(payload, "certificate_id", "certificateId") ??
+          this.topicCertificateId(event),
+      };
+    }
+
+    if (
+      name === "teehashadded" ||
+      name === "teehashremoved" ||
+      name === "provideradded" ||
+      name === "providerremoved"
+    ) {
+      return {
+        kind: "registry",
+        name,
+        eventId: event.id,
+        ledger: event.ledger,
+        transactionHash: event.txHash,
+        payload,
+      };
+    }
+
+    return {
+      kind: "attestation",
+      eventId: event.id,
+      ledger: event.ledger,
+      transactionHash: event.txHash,
+      manifestHash,
+      requestId,
+      attestationHash: field(payload, "attestation_hash", "attestationHash"),
     };
   }
 
@@ -212,6 +322,37 @@ export class EventIngestionService {
 export function createEventIngestionService(): EventIngestionService {
   const { env } = require("../config/env") as typeof import("../config/env");
   const { sorobanService } = require("./soroban.service") as typeof import("./soroban.service");
+
+  if (!defaultSubscriberRegistered) {
+    defaultSubscriberRegistered = true;
+    sorobanEventBus.subscribe(async (event) => {
+      if (event.kind === "registry" || event.kind === "verificationRequest") {
+        return false;
+      }
+
+      const job =
+        event.kind === "certificateMinted"
+          ? await verificationService.completeFromMintEvent({
+              manifestHash: event.manifestHash,
+              requestId: event.requestId,
+              certificateId: event.certificateId,
+              transactionHash: event.transactionHash,
+            })
+          : await verificationService.advanceFromAttestationEvent({
+              manifestHash: event.manifestHash,
+              requestId: event.requestId,
+              attestationHash: event.attestationHash,
+              transactionHash: event.transactionHash,
+            });
+
+      if (!job) return false;
+      if (event.kind === "attestation" && job._id) {
+        await mintService.mintForJob(String(job._id));
+      }
+      return true;
+    });
+  }
+
   return new EventIngestionService(
     sorobanService,
     verificationService,
@@ -219,6 +360,7 @@ export function createEventIngestionService(): EventIngestionService {
     {
       oracleContractId: env.STELLAR_ORACLE_CONTRACT_ID,
       provenanceContractId: env.STELLAR_PROVENANCE_CONTRACT_ID,
+      registryContractId: env.STELLAR_REGISTRY_CONTRACT_ID,
       startLedger: env.EVENT_INGESTION_START_LEDGER || undefined,
       limit: env.EVENT_INGESTION_LIMIT,
     },
