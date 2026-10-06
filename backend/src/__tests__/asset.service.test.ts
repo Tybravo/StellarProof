@@ -19,6 +19,8 @@ describe("AssetService.createFromUpload", () => {
     size: 2048,
     mimetype: "image/png",
     uploadedAt: new Date(),
+    requestedProvider: "ipfs",
+    fallbackUsed: false,
   };
 
   let save: jest.Mock;

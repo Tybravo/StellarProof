@@ -255,9 +255,15 @@ class StorageOrchestratorService {
   }
 
   // Add missing methods for tests and controllers
-  async linkAsset(recordId: string, assetId: string): Promise<void> {
-    // Simple implementation
+  private linkedAssets = new Map<string, string>();
+
+  async linkAsset(recordId: string, assetId: string): Promise<{ assetId: string }> {
+    // Simple implementation that keeps first link
+    if (!this.linkedAssets.has(recordId)) {
+      this.linkedAssets.set(recordId, assetId);
+    }
     console.log(`Linking asset ${assetId} to record ${recordId}`);
+    return { assetId: this.linkedAssets.get(recordId)! };
   }
 
   async findAssetIdByContentHash(contentHash: string): Promise<string | undefined> {

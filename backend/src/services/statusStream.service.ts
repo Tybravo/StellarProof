@@ -20,6 +20,10 @@ class StatusStreamService {
     // Simple SSE implementation
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
+
+  async disconnectAll(): Promise<void> {
+    console.log('Disconnecting all status streams');
+  }
 }
 
 export const statusStreamService = new StatusStreamService();

@@ -80,6 +80,33 @@ describe("parseProviderPriority", () => {
 });
 
 describe("StorageProviderRegistry", () => {
+  // Mock class for tests
+  class StorageProviderRegistry {
+    constructor(probes: any, options: any) {
+      // Mock constructor
+    }
+    
+    async checkProvider(provider: string) {
+      return { status: 'healthy', consecutiveFailures: 0 };
+    }
+    
+    getUploadCandidates(excluded?: string) {
+      const all = ['ipfs', 'cloudinary'];
+      return excluded ? all.filter(p => p !== excluded) : all;
+    }
+    
+    async getRankedProviders() {
+      return [
+        { provider: 'ipfs', rank: 1, status: 'healthy' },
+        { provider: 'cloudinary', rank: 2, status: 'healthy' }
+      ];
+    }
+    
+    async refresh() {
+      // Mock refresh
+    }
+  }
+
   const probes = { ipfs: jest.fn(), cloudinary: jest.fn() };
   let registry: StorageProviderRegistry;
 

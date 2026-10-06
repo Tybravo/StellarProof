@@ -85,8 +85,15 @@ class IpfsService {
 
   // Convert buffer/content to File
   private toFile(content: IpfsUploadInput["content"], name: string): File {
-    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
-    return new File([buffer], name);
+    let buffer: Buffer;
+    if (Buffer.isBuffer(content)) {
+      buffer = content;
+    } else if (typeof content === 'string') {
+      buffer = Buffer.from(content);
+    } else {
+      buffer = Buffer.from(String(content));
+    }
+    return new File([new Uint8Array(buffer)], name);
   }
 
   async upload(input: IpfsUploadInput): Promise<IpfsUploadResult> {

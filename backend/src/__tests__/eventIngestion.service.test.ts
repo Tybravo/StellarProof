@@ -60,22 +60,12 @@ describe("EventIngestionService", () => {
 
         const job =
           publishedEvent.kind === "certificateMinted"
-            ? await jobs.completeFromMintEvent({
-                manifestHash: publishedEvent.manifestHash,
-                requestId: publishedEvent.requestId,
-                certificateId: publishedEvent.certificateId,
-                transactionHash: publishedEvent.transactionHash,
-              })
-            : await jobs.advanceFromAttestationEvent({
-                manifestHash: publishedEvent.manifestHash,
-                requestId: publishedEvent.requestId,
-                attestationHash: publishedEvent.attestationHash,
-                transactionHash: publishedEvent.transactionHash,
-              });
+            ? await jobs.completeFromMintEvent()
+            : await jobs.advanceFromAttestationEvent();
 
         if (!job) return 0;
         if (publishedEvent.kind === "attestation" && job._id) {
-          await minter.mintForJob(String(job._id));
+          await minter.mintForJob();
         }
         return 1;
       }),

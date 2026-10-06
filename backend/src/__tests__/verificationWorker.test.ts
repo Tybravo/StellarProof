@@ -70,6 +70,7 @@ class JobStore {
       ownerPublicKey: dto.ownerPublicKey,
       contentHash: dto.contentHash,
       status: VerificationStatus.PENDING,
+      timeline: [],
     };
     this.jobs.set(job._id as string, job);
     this.history.push(job.status);
@@ -99,6 +100,7 @@ class JobStore {
       _id: crypto.randomBytes(12).toString("hex"),
       ownerPublicKey: Keypair.random().publicKey(),
       contentHash: hex32(),
+      timeline: [],
       ...partial,
     };
     this.jobs.set(job._id as string, job);

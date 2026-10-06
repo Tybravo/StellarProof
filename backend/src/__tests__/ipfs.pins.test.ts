@@ -113,8 +113,6 @@ describe("IpfsService.pinMedia", () => {
 
     const result = await ipfsService.pinMedia({
       cid: CID_V1,
-      name: "photo.png",
-      metadata: { assetId: "a1" },
     });
 
     expect(mockUploadCid).toHaveBeenCalledWith(CID_V1);

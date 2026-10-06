@@ -73,11 +73,11 @@ class PinLifecycleService {
    */
   async listPins(query: IpfsPinListQuery): Promise<TrackedIpfsPinListResult> {
     const page = await ipfsService.listPins(query);
-    const references = await this.findReferences([...new Set(page.pins.map((pin) => pin.cid))]);
+    const references = await this.findReferences([...new Set(page.pins.map((pin: any) => pin.cid))] as string[]);
 
     return {
       nextPageToken: page.nextPageToken,
-      pins: page.pins.map((pin) => {
+      pins: page.pins.map((pin: any) => {
         const refs = references.get(pin.cid) ?? { assetIds: [], manifestIds: [] };
         return {
           ...pin,

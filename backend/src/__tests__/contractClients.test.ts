@@ -166,11 +166,10 @@ describe("typed Soroban contract clients", () => {
       signer,
       unusedSoroban as never,
       120_000,
-      1_000,
-      query
+      1_000
     );
 
-    const certificate = await provenance.getCertificate(7n);
+    const certificate = await provenance.getCertificate("7");
 
     expect(certificate).toEqual(
       expect.objectContaining({

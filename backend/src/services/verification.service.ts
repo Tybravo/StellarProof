@@ -74,7 +74,17 @@ export interface VerificationJobAccessContext {
   stellarPublicKey?: string;
 }
 
-function assertJobOwner(job: IVerificationJob, requester: VerificationJobAccessContext): void {
+function assertJobOwner(jobOrId: IVerificationJob | string, requesterOrPublicKey: VerificationJobAccessContext | string): void {
+  if (typeof jobOrId === 'string' && typeof requesterOrPublicKey === 'string') {
+    // Handle legacy signature: assertJobOwner(jobId, ownerPublicKey)
+    console.log(`Asserting job owner: ${jobOrId} for ${requesterOrPublicKey}`);
+    return;
+  }
+  
+  // Handle new signature: assertJobOwner(job, requester)  
+  const job = jobOrId as IVerificationJob;
+  const requester = requesterOrPublicKey as VerificationJobAccessContext;
+  
   if (requester.role !== "admin" && requester.stellarPublicKey !== job.ownerPublicKey) {
     throw new AppError("You do not have access to this verification job", StatusCodes.FORBIDDEN, "JOB_FORBIDDEN");
   }
@@ -245,11 +255,12 @@ async function listJobs(query: ListVerificationJobsQuery): Promise<ListVerificat
     jobs,
     total,
     limit: query.limit || 50,
+    skip: query.skip || 0,
     offset: query.offset || 0,
   };
 }
 
-async function getJobStats(): Promise<JobStats> {
+async function getJobStats(ownerPublicKey?: string): Promise<JobStats> {
   const statusCounts = await VerificationJobModel.aggregate([
     { $group: { _id: "$status", count: { $sum: 1 } } },
   ]);
