@@ -28,6 +28,24 @@ class AssetService {
   }
 
   /**
+   * Creates an asset from an upload result.
+   */
+  async createFromUpload(data: {
+    creatorId: string;
+    fileName: string;
+    upload: any;  // UploadResult type
+  }): Promise<IAsset> {
+    return this.createAsset({
+      creatorId: data.creatorId,
+      fileName: data.fileName,
+      mimeType: data.upload.mimetype || 'application/octet-stream',
+      sizeBytes: data.upload.size || 0,
+      storageProvider: data.upload.provider || 'ipfs',
+      storageReferenceId: data.upload.cid || data.upload.publicId || '',
+    });
+  }
+
+  /**
    * Retrieves an asset by its ID.
    */
   async getAssetById(id: string): Promise<IAsset | null> {

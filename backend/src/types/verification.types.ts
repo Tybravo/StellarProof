@@ -196,6 +196,7 @@ export interface ListVerificationJobsQuery {
   contentHash?: string;
   limit: number;
   skip: number;
+  offset?: number;  // Add offset for backward compatibility
 }
 
 export interface ListVerificationJobsResult {
@@ -203,6 +204,7 @@ export interface ListVerificationJobsResult {
   total: number;
   limit: number;
   skip: number;
+  offset?: number;  // Add offset for backward compatibility
 }
 
 export interface JobStatusCounts {

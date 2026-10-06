@@ -3,11 +3,15 @@
  * All storage-related types are defined here for consistency
  */
 import type { IpfsAvailability, IpfsPinStatus } from './ipfs.types';
+import { AppError } from '../errors/AppError';
 
 export type StorageProvider = 'cloudinary' | 'ipfs';
 
 /** What a stored object represents: raw media bytes or a provenance manifest */
 export type StorageRecordKind = 'media' | 'manifest';
+
+/** Provider health status */
+export type ProviderHealthStatus = 'healthy' | 'degraded' | 'down';
 
 export interface UploadRequest {
   storageProvider: StorageProvider;
@@ -16,9 +20,13 @@ export interface UploadRequest {
   originalname: string;
   userId: string;
   contentHash?: string;  // Verified SHA-256 hex; computed from the buffer when omitted
+  kind?: StorageRecordKind;  // What the stored object represents
+  assetId?: string;  // Optional asset linking
+  allowFallback?: boolean;  // Allow fallback to other providers
 }
 
 export interface UploadResult {
+  recordId?: string;                  // Database record ID
   provider: StorageProvider;          // Provider that actually stored the file
   requestedProvider: StorageProvider; // Provider the client asked for
   fallbackUsed: boolean;              // True when the requested provider failed and a fallback stored the file
@@ -131,6 +139,8 @@ export interface IStorageProvider {
  */
 export class StorageError extends AppError {
   status: 'fail' | 'error';
+  message: string;
+  statusCode: number;
 
   constructor(
     public provider: StorageProvider | null,
@@ -144,6 +154,8 @@ export class StorageError extends AppError {
       `STORAGE_${operation.toUpperCase()}_FAILED`,
     );
     this.name = 'StorageError';
+    this.message = `Storage Error [${provider}/${operation}]: ${reason}`;
+    this.statusCode = statusCode;
     this.status = statusCode < 500 ? 'fail' : 'error';
     // AppError pins the prototype to AppError; restore it for `instanceof StorageError`.
     Object.setPrototypeOf(this, StorageError.prototype);

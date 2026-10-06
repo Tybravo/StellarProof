@@ -7,7 +7,6 @@ import { protect } from "../middlewares/auth.middleware";
 import { oracleAuth } from "../middlewares/oracleAuth.middleware";
 import { requireJobOwnership, scopeJobsToOwner } from "../middlewares/ownership.middleware";
 import { validateBody, validateParams } from "../middlewares/validate";
-import { protect } from "../middlewares/auth.middleware";
 import { VerificationStatus, VerificationWebhookEvent } from "../types/verification.types";
 
 const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z2-7]{55}$/;

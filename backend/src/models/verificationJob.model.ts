@@ -27,7 +27,7 @@ const ACTIVE_STATUSES = [
   VerificationStatus.MINTING,
 ];
 
-const VerificationTimelineEntrySchema = new Schema<IVerificationTimelineEntry>(
+const VerificationTimelineEntrySchema = new Schema<ITimelineEntry>(
   {
     status: {
       type: String,

@@ -61,6 +61,17 @@ function optionalPositiveIntEnv(key: string, fallback: number): number {
   return value;
 }
 
+function optionalNonNegativeIntEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    console.error(`[Config] ${key} must be a non-negative integer, got "${raw}"`);
+    process.exit(1);
+  }
+  return value;
+}
+
 function rpcUrlList(): string[] {
   return Array.from(
     new Set(
@@ -141,6 +152,25 @@ export const env = {
     "STELLAR_TX_CONFIRMATION_TIMEOUT_MS",
     120_000
   ),
+  
+  /** Oracle code measurement hash for TEE verification */
+  ORACLE_CODE_MEASUREMENT_HASH: optionalEnv("ORACLE_CODE_MEASUREMENT_HASH", ""),
+  
+  /** Verification worker configuration */
+  VERIFICATION_WORKER_POLL_INTERVAL_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_POLL_INTERVAL_MS", 5000),
+  VERIFICATION_WORKER_BATCH_SIZE: optionalPositiveIntEnv("VERIFICATION_WORKER_BATCH_SIZE", 10),
+  VERIFICATION_WORKER_MAX_ATTEMPTS: optionalPositiveIntEnv("VERIFICATION_WORKER_MAX_ATTEMPTS", 3),
+  VERIFICATION_WORKER_RETRY_BASE_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_RETRY_BASE_MS", 1000),
+  VERIFICATION_WORKER_LEASE_MS: optionalPositiveIntEnv("VERIFICATION_WORKER_LEASE_MS", 300000),
+  
+  /** SPV verification configuration */
+  SPV_FETCH_TIMEOUT_MS: optionalPositiveIntEnv("SPV_FETCH_TIMEOUT_MS", 15000),
+  SPV_MAX_MEDIA_BYTES: optionalPositiveIntEnv("SPV_MAX_MEDIA_BYTES", 100 * 1024 * 1024),
+  SPV_MAX_MANIFEST_BYTES: optionalPositiveIntEnv("SPV_MAX_MANIFEST_BYTES", 10 * 1024 * 1024),
+  
+  /** Stellar transaction polling configuration */
+  STELLAR_TX_POLL_INTERVAL_MS: optionalPositiveIntEnv("STELLAR_TX_POLL_INTERVAL_MS", 1000),
+  STELLAR_TX_MAX_CONSECUTIVE_RPC_ERRORS: optionalPositiveIntEnv("STELLAR_TX_MAX_CONSECUTIVE_RPC_ERRORS", 5),
 
   /** Allowed CORS origin for the frontend. */
   CORS_ORIGIN: optionalEnv("CORS_ORIGIN", "http://localhost:3000"),

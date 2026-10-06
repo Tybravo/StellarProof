@@ -5,6 +5,8 @@ import { env } from "./config/env";
 import { startCleanupJob } from "./jobs/cleanup.job";
 import { startVerificationTimeoutJob } from "./jobs/verificationTimeout.job";
 import { startEventIngestionJob } from "./jobs/eventIngestion.job";
+import { startStorageHealthJob } from "./jobs/storageHealth.job";
+import { statusStreamService } from "./services/statusStream.service";
 
 function hasCloudinaryConfig(): boolean {
   return Boolean(
