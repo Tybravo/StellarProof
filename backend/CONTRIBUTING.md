@@ -6,7 +6,7 @@ If you haven't already, please read the [Root CONTRIBUTING.md](../../CONTRIBUTIN
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ Project Architecture Overview
 
 The backend is built with:
 *   **Runtime:** Node.js
@@ -52,7 +52,7 @@ MongoDB Connected: <cluster-url>
 
 ---
 
-## 📂 Folder Structure
+## 📂 Project Folder Structure
 
 Please adhere to the following folder structure when adding new features:
 
@@ -109,4 +109,5 @@ We will be using `Jest` and `Supertest` for backend API testing. If your issue r
 
 ---
 
+## Remark
 Thank you for contributing to StellarProof! If you get stuck, feel free to ask questions in your assigned Git Issue. Happy coding! 🚀
