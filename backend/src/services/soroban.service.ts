@@ -428,7 +428,7 @@ export class SorobanService {
     // Simple implementation for compilation
     return {
       rpcUrl: this.server.serverURL.toString(),
-      networkPassphrase: this.server.networkPassphrase || 'Test SDF Network ; September 2015',
+      networkPassphrase: (this.server as any).networkPassphrase || 'Test SDF Network ; September 2015',
       status: 'healthy',
       latestLedger: 1000,
       transactions: [],

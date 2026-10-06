@@ -66,6 +66,5 @@ export class AttestationService {
     return { attestationHash, signature, codeMeasurementHash: measurement };
   }
 }
-}
 
 export const attestationService = new AttestationService();

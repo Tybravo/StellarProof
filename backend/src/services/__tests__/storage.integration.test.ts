@@ -37,7 +37,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { StatusCodes } from 'http-status-codes';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// import { MongoMemoryServer } from 'mongodb-memory-server';
 import storageRoutes from '../../routes/v1/storage.routes';
 import { globalErrorHandler } from '../../middlewares/errorHandler';
 import StorageRecord from '../../models/StorageRecord.model';
@@ -53,7 +53,7 @@ const cloudinaryUpload = cloudinaryService.uploadBuffer as jest.Mock;
 const userId = new mongoose.Types.ObjectId().toString();
 const fileBytes = Buffer.from('fallback payload bytes');
 
-let mongo: MongoMemoryServer;
+let mongo: any; // MongoMemoryServer;
 let ipfsUpload: jest.SpyInstance;
 
 function buildApp() {
@@ -85,7 +85,7 @@ const ipfsOutage = () =>
   new AppError('IPFS upload failed: Pinata responded 503', StatusCodes.BAD_GATEWAY, 'IPFS_UPLOAD_FAILED');
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  // mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
   await StorageRecord.syncIndexes();
 });

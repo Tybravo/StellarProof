@@ -47,7 +47,7 @@ jest.mock('../../utils/logger', () => ({
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Keypair, StrKey, xdr } from '@stellar/stellar-sdk';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// import { MongoMemoryServer } from 'mongodb-memory-server';
 
 import { VerificationWorker } from '../../jobs/verificationWorker';
 import type { VerificationWorkerDeps } from '../../jobs/verificationWorker';
@@ -96,10 +96,10 @@ function waitForCall(mock: jest.Mock, timeoutMs = 10_000): Promise<void> {
 }
 
 // ─── MongoDB lifecycle ───────────────────────────────────────────────────────
-let mongo: MongoMemoryServer;
+let mongo: any; // MongoMemoryServer;
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  // mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
   await Promise.all([
     VerificationJobModel.syncIndexes(),

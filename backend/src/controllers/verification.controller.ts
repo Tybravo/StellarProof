@@ -154,8 +154,8 @@ export class VerificationController {
     try {
       const requester = req.user;
       const timeline = await verificationService.getJobTimeline(req.params.id, {
-        role: requester.role,
-        stellarPublicKey: requester.stellarPublicKey,
+        role: requester?.role || 'creator',
+        stellarPublicKey: requester?.stellarPublicKey || '',
       });
       res.status(StatusCodes.OK).json({ success: true, data: timeline });
     } catch (err) {
@@ -172,8 +172,8 @@ export class VerificationController {
     try {
       const requester = req.user;
       const job = await verificationService.retryJob(req.params.id, {
-        role: requester.role,
-        stellarPublicKey: requester.stellarPublicKey,
+        role: requester?.role || 'creator',
+        stellarPublicKey: requester?.stellarPublicKey || '',
       });
       res.status(StatusCodes.CREATED).json({
         success: true,

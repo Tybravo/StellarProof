@@ -29,24 +29,24 @@ const ACTIVE_STATUSES = [
 
 const VerificationTimelineEntrySchema = new Schema<ITimelineEntry>(
   {
-    status: {
+    stage: {
       type: String,
-      required: [true, "timeline entry status is required"],
+      required: [true, "timeline entry stage is required"],
       enum: {
         values: ALL_STATUSES,
-        message: `timeline entry status must be one of: ${ALL_STATUSES.join(", ")}`,
+        message: `timeline entry stage must be one of: ${ALL_STATUSES.join(", ")}`,
       },
     },
-    timestamp: {
+    at: {
       type: Date,
       required: [true, "timeline entry timestamp is required"],
       default: Date.now,
     },
-    message: {
-      type: String,
-      trim: true,
-      default: undefined,
-    },
+    // message: {
+    //   type: String,
+    //   trim: true,
+    //   default: undefined,
+    // },
     actor: {
       type: String,
       enum: ["worker", "oracle", "user"],

@@ -31,7 +31,7 @@ import { createHash } from 'crypto';
 import express from 'express';
 import mongoose from 'mongoose';
 import request from 'supertest';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// import { MongoMemoryServer } from 'mongodb-memory-server';
 import storageRoutes from '../routes/v1/storage.routes';
 import { globalErrorHandler } from '../middlewares/errorHandler';
 import StorageRecord from '../models/StorageRecord.model';
@@ -47,7 +47,7 @@ jest.setTimeout(60_000);
 const sha256 = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 const cidFor = (data: Buffer) => `bafkrei${sha256(data).slice(0, 52)}`;
 
-let mongo: MongoMemoryServer;
+let mongo: any; // MongoMemoryServer;
 let uploadSpy: jest.SpyInstance;
 
 const userA = new mongoose.Types.ObjectId().toString();
@@ -73,7 +73,7 @@ function buildApp() {
 }
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  // mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
   await StorageRecord.syncIndexes();
 });
