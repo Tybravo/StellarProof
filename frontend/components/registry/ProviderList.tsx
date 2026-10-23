@@ -8,9 +8,12 @@ import {
   UserCheck,
   Info,
   ArrowUpRight,
+  Activity,
+  ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type OracleProvider } from "../../services/registry";
+import { NodeMetricsChart } from "./NodeMetricsChart";
 
 interface ProviderListProps {
   providers: OracleProvider[];
@@ -57,6 +60,8 @@ function CopyButton({ value }: { value: string }) {
 }
 
 export function ProviderList({ providers, isLoading }: ProviderListProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -96,42 +101,78 @@ export function ProviderList({ providers, isLoading }: ProviderListProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.3 }}
-              className="group relative flex items-center justify-between p-4 rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-white/5 hover:border-primary/50 dark:hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
+              className="group relative rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-white/5 hover:border-primary/50 dark:hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
             >
-              <div className="flex items-center gap-4">
-                {/* Identity Icon/Badge */}
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/10 group-hover:scale-110 transition-transform">
-                  <UserCheck className="w-5 h-5 text-primary" />
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-4">
+                  {/* Identity Icon/Badge */}
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/10 group-hover:scale-110 transition-transform">
+                    <UserCheck className="w-5 h-5 text-primary" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        {provider.name}
+                      </span>
+                      <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-tight bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-500/20">
+                        <Shield className="w-2.5 h-2.5" />
+                        Authorized
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                      {truncateAddress(provider.address)}
+                      <CopyButton value={provider.address} />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-900 dark:text-white">
-                      {provider.name}
-                    </span>
-                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-tight bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-500/20">
-                      <Shield className="w-2.5 h-2.5" />
-                      Authorized
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 font-mono text-xs text-gray-500 dark:text-gray-400">
-                    {truncateAddress(provider.address)}
-                    <CopyButton value={provider.address} />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedId((current) => (current === provider.id ? null : provider.id))
+                    }
+                    aria-expanded={expandedId === provider.id}
+                    aria-label={`Toggle uptime and latency chart for ${provider.name}`}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-primary transition-colors bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-lg"
+                  >
+                    <Activity className="w-3 h-3" />
+                    Metrics
+                    <ChevronDown
+                      className={`w-3 h-3 transition-transform ${
+                        expandedId === provider.id ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  <a
+                    href={`https://stellar.expert/explorer/${provider.network === "Mainnet" ? "public" : "testnet"}/account/${provider.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-primary transition-colors bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-lg group/link"
+                  >
+                    Explorer
+                    <ArrowUpRight className="w-3 h-3 group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5 transition-transform" />
+                  </a>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <a
-                  href={`https://stellar.expert/explorer/${provider.network === "Mainnet" ? "public" : "testnet"}/account/${provider.address}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-primary transition-colors bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-lg group/link"
-                >
-                  Explorer
-                  <ArrowUpRight className="w-3 h-3 group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5 transition-transform" />
-                </a>
-              </div>
+              <AnimatePresence initial={false}>
+                {expandedId === provider.id && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden px-4 pb-4"
+                  >
+                    <NodeMetricsChart
+                      nodeId={provider.id}
+                      label={`${provider.name} uptime & latency`}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           ))}
         </AnimatePresence>
