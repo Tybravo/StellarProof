@@ -10,6 +10,7 @@ import { WizardProvider } from "../context/WizardContext";
 import { ToastProvider } from "../context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
+import { ModalProvider } from "@/components/ui/ModalProvider";
 import QueryProvider from "../context/QueryProvider";
  
 const geistSans = Geist({
@@ -82,10 +83,12 @@ export default function RootLayout({
               <WizardProvider>
                 <QueryProvider>
                   <AuthProvider>
-                    {children}
-                    <Footer />
-                    <ScrollToTop />
-                    <DebugPanel />
+                    <ModalProvider>
+                      {children}
+                      <Footer />
+                      <ScrollToTop />
+                      <DebugPanel />
+                    </ModalProvider>
                   </AuthProvider>
                 </QueryProvider>
               </WizardProvider>
