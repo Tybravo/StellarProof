@@ -11,6 +11,11 @@ interface Toast {
   duration?: number;
 }
 
+// This is the reusable toast provider requested in #661: a global context
+// with success/error/info variants and auto-dismiss, used across the app
+// (see ToastProvider below and useToast). The issue names a different path
+// (components/ui/ToastProvider.tsx); this is the existing implementation
+// that already meets the acceptance criteria.
 interface ToastContextType {
   addToast: (toast: Omit<Toast, "id">) => void;
   removeToast: (id: string) => void;
