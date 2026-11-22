@@ -1,5 +1,5 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { signTransaction } from '@stellar/freighter-api';
+import { signWithFreighter, transactionErrorMessage } from '@/hooks/useSignTransaction';
 import { walletService } from './wallet';
 
 export interface SubmissionResult {
@@ -19,7 +19,8 @@ const server = new StellarSDK.Horizon.Server(HORIZON_URL);
 export const submitVerificationRequest = async (
   contentHash: string,
   manifestHash: string | null,
-  publicKey: string
+  publicKey: string,
+  onSigningChange?: (signing: boolean) => void
 ): Promise<SubmissionResult> => {
   try {
     if (!CONTRACT_ID) {
@@ -57,25 +58,15 @@ export const submitVerificationRequest = async (
       .setTimeout(30)
       .build();
 
-    // Sign with Freighter
-    const signedResult = await signTransaction(transaction.toXDR(), {
-      address: publicKey,
-      networkPassphrase: networkPassphrase,
-    });
-
-    // Extract the signed XDR string correctly
     let signedXDR: string;
-    if (typeof signedResult === 'string') {
-      signedXDR = signedResult;
-    } else if (signedResult && typeof signedResult === 'object') {
-      // Handle the case where signedResult is an object with signedTxXdr
-      const resultObj = signedResult as { signedTxXdr?: string; signedTransaction?: string };
-      signedXDR = resultObj.signedTxXdr || resultObj.signedTransaction || '';
-      if (!signedXDR) {
-        throw new Error('No signed transaction XDR returned from Freighter');
-      }
-    } else {
-      throw new Error('Invalid response from Freighter signing');
+    onSigningChange?.(true);
+    try {
+      signedXDR = await signWithFreighter(transaction.toXDR(), {
+        address: publicKey,
+        networkPassphrase,
+      });
+    } finally {
+      onSigningChange?.(false);
     }
 
     // Submit the transaction
@@ -110,27 +101,7 @@ export const submitVerificationRequest = async (
   } catch (error) {
     console.error('Error submitting verification request:', error);
 
-    if (error instanceof Error) {
-      if (
-        error.message.includes('User declined') ||
-        error.message.includes('rejected') ||
-        error.message.includes('Rejected')
-      ) {
-        throw new Error('User declined the signing request');
-      }
-
-      if (error.message.includes('tx_bad_seq')) {
-        throw new Error('Transaction sequence error. Please try again.');
-      }
-
-      if (error.message.includes('insufficient balance')) {
-        throw new Error('Insufficient balance to submit the verification request.');
-      }
-
-      throw new Error(`Transaction failed: ${error.message}`);
-    }
-
-    throw new Error('An unexpected error occurred while submitting the verification request');
+    throw new Error(transactionErrorMessage(error));
   }
 };
 
