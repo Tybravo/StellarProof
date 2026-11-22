@@ -1,0 +1,39 @@
+# CODEOWNERS
+#
+# Protect the repository against the open-source malware campaign that
+# spreads via merged pull requests (fa-solid-* font shims, dist/setup.js
+# bootstrap, automatic VS Code tasks, npm lifecycle-script injection).
+#
+# Changes to these paths require review/approval by the listed owners.
+# Files not listed here default to the repo owner.
+#
+# NOTE: update the owner lines below to your real team/username (currently
+# the repository owner @Tybravo). If you use a team, enable it under
+# Settings -> Collaborators, or GitHub will fail to load CODEOWNERS.
+
+# --- Tooling / automation that can execute code ---
+/.vscode/                          @Tybravo
+/.devcontainer/                    @Tybravo
+/.github/                          @Tybravo
+/hooks/                            @Tybravo
+/.husky/                           @Tybravo
+
+# --- Package manager lifecycle scripts ---
+/package.json                      @Tybravo
+/frontend/package.json             @Tybravo
+/backend/package.json              @Tybravo
+/frontend/package-lock.json        @Tybravo
+/frontend/pnpm-lock.yaml           @Tybravo
+/pnpm-lock.yaml                    @Tybravo
+/npm-shrinkwrap.json               @Tybravo
+
+# --- Binary / font files (campaign payload carriers) ---
+# These patterns are a catch-all; add the explicit file names as needed.
+**/*.woff2                         @Tybravo
+**/*.eot                           @Tybravo
+**/*.ttf                           @Tybravo
+**/*.exe                           @Tybravo
+**/*.dll                           @Tybravo
+**/*.wasm                          @Tybravo
+/public/fonts/**                   @Tybravo
+/dist/**                           @Tybravo

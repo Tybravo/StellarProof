@@ -20,6 +20,7 @@ dist
 dist-ssr
 *.local
 scripts
+!.github/scripts/
 
 #ENV File
 .env
