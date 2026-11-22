@@ -18,6 +18,15 @@ export interface SubmissionResult {
   timestamp: string;
 }
 
+/** Lifecycle of the verification application as tracked by the wizard. */
+export type ApplicationStatus = 'Draft' | 'Minting' | 'Minted';
+
+export interface MintedCertificate {
+  certificateId: string;
+  txHash: string;
+  mintedAt: string;
+}
+
 interface WizardState {
   // Navigation
   currentStep: number;
@@ -49,6 +58,17 @@ interface WizardState {
   setSubmissionResult: (result: SubmissionResult | null) => void;
   setSubmissionError: (error: string | null) => void;
 
+  // Minting
+  applicationStatus: ApplicationStatus;
+  mintedCertificate: MintedCertificate | null;
+  mintError: string | null;
+  /** Marks a mint as in flight and clears any previous mint error. */
+  startMint: () => void;
+  /** Records a failed mint. Wizard data is kept so the user can retry. */
+  failMint: (error: string) => void;
+  /** On success: clears wizard data and moves the application to "Minted". */
+  completeMint: (certificate: MintedCertificate) => void;
+
   // Validation
   validation: Record<number, boolean>;
   setStepValid: (step: number, valid: boolean) => void;
@@ -70,6 +90,16 @@ const defaultContent: UploadContentData = {
   manifestHash: null,
   encryptionEnabled: true,
   spvResult: null,
+};
+
+/** Wizard data that is discarded on both a manual reset and a completed mint. */
+const clearedWizardState = {
+  currentStep: 0,
+  formData: {} as WizardFormData,
+  validation: {} as Record<number, boolean>,
+  isSubmitting: false,
+  submissionResult: null,
+  submissionError: null,
 };
 
 //
@@ -182,6 +212,25 @@ export const useWizardStore = create<WizardState>()(
       setSubmissionError: (submissionError) => set({ submissionError, submissionResult: null }),
 
       //
+      // Minting
+      //
+      applicationStatus: 'Draft',
+      mintedCertificate: null,
+      mintError: null,
+
+      startMint: () => set({ applicationStatus: 'Minting', mintError: null }),
+
+      failMint: (mintError) => set({ applicationStatus: 'Draft', mintError }),
+
+      completeMint: (mintedCertificate) =>
+        set({
+          ...clearedWizardState,
+          applicationStatus: 'Minted',
+          mintedCertificate,
+          mintError: null,
+        }),
+
+      //
       // Validation
       //
       validation: {},
@@ -199,12 +248,10 @@ export const useWizardStore = create<WizardState>()(
       //
       resetWizard: () =>
         set({
-          currentStep: 0,
-          formData: {},
-          validation: {},
-          isSubmitting: false,
-          submissionResult: null,
-          submissionError: null,
+          ...clearedWizardState,
+          applicationStatus: 'Draft',
+          mintedCertificate: null,
+          mintError: null,
         }),
 
       //
