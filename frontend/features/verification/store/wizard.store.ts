@@ -18,7 +18,17 @@ export interface SubmissionResult {
   timestamp: string;
 }
 
+export type VerificationWorkflowStage = 'Idle' | 'Requested' | 'Processing' | 'Attested' | 'Minted' | 'Failed';
+
+export interface VerificationProgressState {
+  stage: VerificationWorkflowStage;
+  requestId: string | null;
+  transactionHash: string | null;
+}
+
 interface WizardState {
+  verificationProgress: VerificationProgressState;
+  setVerificationProgress: (progress: Partial<VerificationProgressState>) => void;
   // Navigation
   currentStep: number;
   setStep: (step: number) => void;
@@ -79,6 +89,11 @@ const defaultContent: UploadContentData = {
 export const useWizardStore = create<WizardState>()(
   persist(
     (set) => ({
+      verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
+      setVerificationProgress: (progress) =>
+        set((state) => ({
+          verificationProgress: { ...state.verificationProgress, ...progress },
+        })),
       //
       // Navigation
       //
@@ -205,6 +220,7 @@ export const useWizardStore = create<WizardState>()(
           isSubmitting: false,
           submissionResult: null,
           submissionError: null,
+          verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
         }),
 
       //
