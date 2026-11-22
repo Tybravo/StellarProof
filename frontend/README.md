@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## End-to-end tests (Cypress)
+
+`cypress/e2e/verification-flow.cy.ts` runs the verification wizard (upload, manifest, privacy, review and mint). Freighter and Horizon are stubbed, so no wallet or network access is needed.
+
+```bash
+# terminal 1: start the app with a valid contract id
+NEXT_PUBLIC_VITE_SOROBAN_CONTRACT_ID=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4 pnpm dev
+
+# terminal 2
+pnpm e2e        # headless
+pnpm e2e:open   # interactive
+```
+
+Set `CYPRESS_BASE_URL` if the app is not on `http://localhost:3000`.

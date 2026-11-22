@@ -8,6 +8,30 @@ export interface SubmissionResult {
   certificateId?: string;
 }
 
+export type SubmissionFailureKind =
+  | 'user_rejected'
+  | 'network'
+  | 'on_chain'
+  | 'configuration'
+  | 'unknown';
+
+/** Error thrown by submitVerificationRequest with a machine readable failure category. */
+export class VerificationSubmissionError extends Error {
+  kind: SubmissionFailureKind;
+  resultCodes?: { transaction?: string; operations?: string[] };
+
+  constructor(
+    message: string,
+    kind: SubmissionFailureKind = 'unknown',
+    resultCodes?: { transaction?: string; operations?: string[] }
+  ) {
+    super(message);
+    this.name = 'VerificationSubmissionError';
+    this.kind = kind;
+    this.resultCodes = resultCodes;
+  }
+}
+
 // Configuration from environment
 const HORIZON_URL = process.env.NEXT_PUBLIC_VITE_HORIZON_URL || 'https://horizon-testnet.stellar.org';
 const NETWORK_PASSPHRASE = process.env.NEXT_PUBLIC_VITE_NETWORK_PASSPHRASE || StellarSDK.Networks.TESTNET;
@@ -69,7 +93,15 @@ export const submitVerificationRequest = async (
       signedXDR = signedResult;
     } else if (signedResult && typeof signedResult === 'object') {
       // Handle the case where signedResult is an object with signedTxXdr
-      const resultObj = signedResult as { signedTxXdr?: string; signedTransaction?: string };
+      const resultObj = signedResult as {
+        signedTxXdr?: string;
+        signedTransaction?: string;
+        error?: { message?: string } | string;
+      };
+      if (resultObj.error) {
+        const detail = typeof resultObj.error === 'string' ? resultObj.error : resultObj.error.message;
+        throw new Error(detail || 'Freighter failed to sign the transaction');
+      }
       signedXDR = resultObj.signedTxXdr || resultObj.signedTransaction || '';
       if (!signedXDR) {
         throw new Error('No signed transaction XDR returned from Freighter');
@@ -109,30 +141,78 @@ export const submitVerificationRequest = async (
     };
   } catch (error) {
     console.error('Error submitting verification request:', error);
-
-    if (error instanceof Error) {
-      if (
-        error.message.includes('User declined') ||
-        error.message.includes('rejected') ||
-        error.message.includes('Rejected')
-      ) {
-        throw new Error('User declined the signing request');
-      }
-
-      if (error.message.includes('tx_bad_seq')) {
-        throw new Error('Transaction sequence error. Please try again.');
-      }
-
-      if (error.message.includes('insufficient balance')) {
-        throw new Error('Insufficient balance to submit the verification request.');
-      }
-
-      throw new Error(`Transaction failed: ${error.message}`);
-    }
-
-    throw new Error('An unexpected error occurred while submitting the verification request');
+    throw toSubmissionError(error);
   }
 };
+
+interface HorizonErrorLike {
+  response?: {
+    status?: number;
+    data?: { extras?: { result_codes?: { transaction?: string; operations?: string[] } } };
+  };
+}
+
+function toSubmissionError(error: unknown): VerificationSubmissionError {
+  if (error instanceof VerificationSubmissionError) return error;
+
+  if (!(error instanceof Error)) {
+    return new VerificationSubmissionError(
+      'An unexpected error occurred while submitting the verification request'
+    );
+  }
+
+  const message = error.message;
+  const resultCodes = (error as HorizonErrorLike).response?.data?.extras?.result_codes;
+
+  if (message.includes('Soroban contract ID not configured')) {
+    return new VerificationSubmissionError(message, 'configuration');
+  }
+
+  if (resultCodes) {
+    const code = resultCodes.transaction;
+    const ops = resultCodes.operations?.filter((op) => op !== 'op_success') ?? [];
+    let friendly = 'The transaction was rejected by the Stellar network.';
+    if (code === 'tx_bad_seq') friendly = 'Transaction sequence error. Please try again.';
+    else if (code === 'tx_insufficient_balance' || ops.includes('op_underfunded'))
+      friendly = 'Insufficient balance to submit the verification request.';
+    else if (code === 'tx_insufficient_fee')
+      friendly = 'The network fee was too low. Please try again.';
+    else if (code === 'tx_too_late') friendly = 'The transaction expired before it was included in a ledger. Please try again.';
+    const detail = [code, ...ops].filter(Boolean).join(', ');
+    return new VerificationSubmissionError(
+      detail ? `${friendly} (${detail})` : friendly,
+      'on_chain',
+      resultCodes
+    );
+  }
+
+  if (message.includes('User declined') || /rejected/i.test(message)) {
+    return new VerificationSubmissionError('User declined the signing request', 'user_rejected');
+  }
+
+  if (message.includes('tx_bad_seq')) {
+    return new VerificationSubmissionError('Transaction sequence error. Please try again.', 'on_chain');
+  }
+
+  if (message.includes('insufficient balance')) {
+    return new VerificationSubmissionError(
+      'Insufficient balance to submit the verification request.',
+      'on_chain'
+    );
+  }
+
+  if (
+    /network error|failed to fetch|timeout|timed out|ECONN|ENOTFOUND/i.test(message) ||
+    (error as HorizonErrorLike).response?.status === 503
+  ) {
+    return new VerificationSubmissionError(
+      `Could not reach the Stellar network: ${message}`,
+      'network'
+    );
+  }
+
+  return new VerificationSubmissionError(`Transaction failed: ${message}`, 'unknown');
+}
 
 export type VerificationStatus = 'pending' | 'verified' | 'failed' | 'processing';
 
