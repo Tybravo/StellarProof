@@ -51,6 +51,11 @@ interface WizardState {
   setEncryptionEnabled: (enabled: boolean) => void;
   setSPVResult: (result: UploadContentData['spvResult']) => void;
 
+  // IPFS content helpers
+  setMediaCid: (cid: string | null) => void;
+  setManifestCid: (cid: string | null) => void;
+  setIpfsUploadState: (state: { isUploading?: boolean; error?: string | null }) => void;
+
   // Submission state
   isSubmitting: boolean;
   submissionResult: SubmissionResult | null;
@@ -80,6 +85,10 @@ const defaultContent: UploadContentData = {
   manifestHash: null,
   encryptionEnabled: true,
   spvResult: null,
+  mediaCid: null,
+  manifestCid: null,
+  isIpfsUploading: false,
+  ipfsError: null,
 };
 
 //
@@ -180,6 +189,47 @@ export const useWizardStore = create<WizardState>()(
           formData: {
             ...state.formData,
             content: { ...defaultContent, ...state.formData.content, spvResult },
+          },
+        })),
+
+      setMediaCid: (mediaCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              mediaCid,
+              isIpfsUploading: false,
+              ipfsError: null,
+            },
+          },
+        })),
+
+      setManifestCid: (manifestCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              manifestCid,
+              isIpfsUploading: false,
+              ipfsError: null,
+            },
+          },
+        })),
+
+      setIpfsUploadState: ({ isUploading, error }) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              ...(isUploading !== undefined ? { isIpfsUploading: isUploading } : {}),
+              ...(error !== undefined ? { ipfsError: error } : {}),
+            },
           },
         })),
 
