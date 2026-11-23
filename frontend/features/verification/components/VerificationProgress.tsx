@@ -1,54 +1,35 @@
 'use client';
 
-import { LoaderCircle, Radio, RefreshCw, WifiOff } from 'lucide-react';
-import { useWizardStore } from '../store/wizard.store';
+import { Loader2 } from 'lucide-react';
+import { useSpvUpdates, SpvStatus } from '@/hooks/useSpvUpdates';
 
-export interface VerificationProgressProps {
-  isPolling: boolean;
-  connectionState?: 'connected' | 'reconnecting' | 'offline';
-  error?: string | null;
-  onRetry?: () => void;
-}
+const labels: Record<SpvStatus, string> = {
+  pending: 'Waiting for a worker', processing: 'Processing media',
+  tee_verifying: 'Verifying proof', minting: 'Issuing certificate',
+  completed: 'Verification complete', failed: 'Verification failed',
+};
 
-export default function VerificationProgress({
-  isPolling,
-  connectionState = 'connected',
-  error,
-  onRetry,
-}: VerificationProgressProps) {
-  const stage = useWizardStore((state) => state.verificationProgress.stage);
-  const online = connectionState === 'connected';
-
+export function VerificationProgress({ streamUrl }: { streamUrl?: string }) {
+  const { update, connection, error } = useSpvUpdates(streamUrl);
+  const status = update?.status;
+  const busy = status !== 'completed' && status !== 'failed';
   return (
-    <section className="border-y border-gray-200 py-4 dark:border-gray-800" aria-live="polite">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-950 dark:text-white">{stage}</p>
-          {error && <p className="mt-1 text-sm text-red-700 dark:text-red-400">{error}</p>}
-        </div>
-        <span
-          role="status"
-          className={`inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-semibold ${
-            online
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-              : 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-          }`}
-        >
-          {online ? <Radio className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-          {isPolling ? (
-            <><LoaderCircle className="h-4 w-4 animate-spin" /> Polling</>
-          ) : online ? 'Connected' : 'Reconnecting'}
-        </span>
+    <section aria-label="Verification progress" aria-busy={busy}
+      className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+      <div role="status" aria-live="polite" className="flex items-center gap-3">
+        {busy && <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-blue-600 motion-reduce:animate-none" />}
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {status ? labels[status] : 'Verification in progress'}
+        </h2>
       </div>
-      {error && onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-gray-900 px-3 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-white dark:text-gray-950"
-        >
-          <RefreshCw className="h-4 w-4" /> Retry
-        </button>
-      )}
+      {busy && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        {connection === 'idle' ? 'Waiting for a verification job.' :
+          connection === 'connecting' ? 'Connecting to processing updates…' : 'Your request is being processed.'}
+      </p>}
+      {error && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-400">{error.message}</p>}
+      {status === 'failed' && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-400">
+        Processing failed. Review the request before retrying.
+      </p>}
     </section>
   );
 }
