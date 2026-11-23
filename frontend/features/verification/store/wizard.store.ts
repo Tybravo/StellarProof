@@ -18,7 +18,17 @@ export interface SubmissionResult {
   timestamp: string;
 }
 
+export type VerificationWorkflowStage = 'Idle' | 'Requested' | 'Processing' | 'Attested' | 'Minted' | 'Failed';
+
+export interface VerificationProgressState {
+  stage: VerificationWorkflowStage;
+  requestId: string | null;
+  transactionHash: string | null;
+}
+
 interface WizardState {
+  verificationProgress: VerificationProgressState;
+  setVerificationProgress: (progress: Partial<VerificationProgressState>) => void;
   // Navigation
   currentStep: number;
   setStep: (step: number) => void;
@@ -40,6 +50,11 @@ interface WizardState {
   setManifest: (manifest: UploadContentData['manifest'], manifestHash: string | null) => void;
   setEncryptionEnabled: (enabled: boolean) => void;
   setSPVResult: (result: UploadContentData['spvResult']) => void;
+
+  // IPFS content helpers
+  setMediaCid: (cid: string | null) => void;
+  setManifestCid: (cid: string | null) => void;
+  setIpfsUploadState: (state: { isUploading?: boolean; error?: string | null }) => void;
 
   // Submission state
   isSubmitting: boolean;
@@ -70,6 +85,10 @@ const defaultContent: UploadContentData = {
   manifestHash: null,
   encryptionEnabled: true,
   spvResult: null,
+  mediaCid: null,
+  manifestCid: null,
+  isIpfsUploading: false,
+  ipfsError: null,
 };
 
 //
@@ -79,6 +98,11 @@ const defaultContent: UploadContentData = {
 export const useWizardStore = create<WizardState>()(
   persist(
     (set) => ({
+      verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
+      setVerificationProgress: (progress) =>
+        set((state) => ({
+          verificationProgress: { ...state.verificationProgress, ...progress },
+        })),
       //
       // Navigation
       //
@@ -168,6 +192,47 @@ export const useWizardStore = create<WizardState>()(
           },
         })),
 
+      setMediaCid: (mediaCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              mediaCid,
+              isIpfsUploading: false,
+              ipfsError: null,
+            },
+          },
+        })),
+
+      setManifestCid: (manifestCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              manifestCid,
+              isIpfsUploading: false,
+              ipfsError: null,
+            },
+          },
+        })),
+
+      setIpfsUploadState: ({ isUploading, error }) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: {
+              ...defaultContent,
+              ...state.formData.content,
+              ...(isUploading !== undefined ? { isIpfsUploading: isUploading } : {}),
+              ...(error !== undefined ? { ipfsError: error } : {}),
+            },
+          },
+        })),
+
       //
       // Submission state
       //
@@ -205,6 +270,7 @@ export const useWizardStore = create<WizardState>()(
           isSubmitting: false,
           submissionResult: null,
           submissionError: null,
+          verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
         }),
 
       //
