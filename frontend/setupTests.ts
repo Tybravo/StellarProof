@@ -1,9 +1,9 @@
 import "@testing-library/jest-dom";
 
-if (!Element.prototype.scrollIntoView) {
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = jest.fn();
 }
 
-if (!window.scrollTo) {
+if (typeof window !== 'undefined' && !window.scrollTo) {
   window.scrollTo = jest.fn();
 }

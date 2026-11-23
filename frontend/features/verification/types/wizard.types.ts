@@ -34,6 +34,8 @@ export interface SPVResult {
 }
 
 export interface UploadContentData {
+  mediaCid?: string | null;
+  manifestCid?: string | null;
   file: FileInfo | null;
   fileError?: string | null;
   contentHash: string | null;
