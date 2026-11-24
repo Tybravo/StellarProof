@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { scValToNative, xdr } from '@stellar/stellar-sdk';
 import { useWizardStore } from '@/features/verification/store/wizard.store';
+import { FailoverRpcServer } from '@/services/rpcWrapper';
 
 const DEFAULT_RPC_URL = 'https://soroban-testnet.stellar.org';
 const TOPICS = ['VerificationRequest', 'Attestation', 'Attested'];
@@ -69,7 +70,7 @@ export function parsePollingEvent(event: ContractEvent): ParsedPollingEvent | nu
 }
 
 function rpcEventSource(contractId: string, rpcUrl: string): AttestationEventSource {
-  const server = new rpc.Server(rpcUrl);
+  const server = new FailoverRpcServer(rpcUrl);
   const topics = TOPICS.map((topic) => [xdr.ScVal.scvSymbol(topic).toXDR('base64')]);
   return async (startLedger) => {
     const initialLedger = startLedger ?? (await server.getLatestLedger()).sequence;

@@ -69,3 +69,5 @@ export const uploadFileToIPFS = async (file: File): Promise<IpfsUploadResponse> 
     };
   }
 };
+
+export { uploadMediaWithFallback, uploadToCloudinary } from './cloudinaryFallback';
