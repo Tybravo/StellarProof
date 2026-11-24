@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 import { VaultActions } from "../../components/vault/VaultActions";
 import { DecryptionPreview } from "../../components/vault/DecryptionPreview";
+import { RotateKeyButton } from "../../components/vault/RotateKeyButton";
 
 /* ------------------------------------------------------------------ */
 /*                          Mock service layer                         */
@@ -496,7 +497,7 @@ function Pagination({ page, totalPages, onPage }: PaginationProps) {
 /* ------------------------------------------------------------------ */
 
 export default function VaultPage() {
-  const { isConnected, connect } = useWallet();
+  const { isConnected, publicKey, connect } = useWallet();
 
   const [query, setQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -582,10 +583,13 @@ export default function VaultPage() {
           </div>
 
           {isConnected && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700">
-              <ShieldCheck className="w-3.5 h-3.5" aria-hidden />
-              Vault Active
-            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <RotateKeyButton userId={publicKey ?? undefined} />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700">
+                <ShieldCheck className="w-3.5 h-3.5" aria-hidden />
+                Vault Active
+              </span>
+            </div>
           )}
         </div>
 
