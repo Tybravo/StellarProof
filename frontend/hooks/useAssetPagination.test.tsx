@@ -81,7 +81,7 @@ test("clamps and refetches when the total drops on a later page", async () => {
 
 test.each([
   { total: -1 }, { total: 1.5 }, { total: NaN }, { total: Infinity },
-  { total: Number.MAX_SAFE_INTEGER + 1 }, {}, { hasNext: "false" },
+  { total: Number.MAX_SAFE_INTEGER + 1 }, { total: 0 }, {}, { hasNext: "false" },
   { total: 21, hasNext: false }, { total: 10, hasNext: true },
 ])("rejects malformed metadata %#", async (metadata) => {
   const fetchPage = async () => ({ items: [1], ...metadata }) as PaginatedResult<number>;

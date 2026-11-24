@@ -48,7 +48,7 @@ export function useAssetPagination<T>(
       try {
         const data = await requestPage({ skip, limit: pageSize, signal: controller.signal });
         if (controller.signal.aborted) return;
-        if (!isValidPage(data)) throw new Error("Invalid pagination response.");
+        if (!isValidPage(data, skip)) throw new Error("Invalid pagination response.");
         const lastPage = data.total === undefined ? undefined : Math.ceil(data.total / pageSize);
         if (lastPage !== undefined && page > Math.max(1, lastPage)) {
           setPosition({ ...position, page: Math.max(1, lastPage) });
@@ -89,10 +89,11 @@ export function useAssetPagination<T>(
   return { page, pageSize, skip, totalPages, hasNext, state, onPage, retry };
 }
 
-function isValidPage<T>(data: PaginatedResult<T>): boolean {
+function isValidPage<T>(data: PaginatedResult<T>, skip: number): boolean {
   if (!data || !Array.isArray(data.items)) return false;
   if (data.total !== undefined) {
-    return Number.isSafeInteger(data.total) && data.total >= 0 && data.hasNext === undefined;
+    return Number.isSafeInteger(data.total) && data.total >= 0 &&
+      data.hasNext === undefined && data.items.length <= Math.max(0, data.total - skip);
   }
   return typeof data.hasNext === "boolean";
 }
