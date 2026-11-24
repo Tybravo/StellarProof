@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   Edit2,
@@ -8,10 +8,7 @@ import {
   ShieldCheck,
   Hash,
   FileText,
-  Send,
   Loader2,
-  Upload,
-  AlertCircle,
   RotateCcw,
   ExternalLink,
   Copy,
@@ -20,10 +17,9 @@ import {
   Lock,
   Globe,
 } from 'lucide-react';
-import { isConnected, requestAccess } from '@stellar/freighter-api';
 import { useWizardStore, SubmissionResult } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
-import { submitVerificationRequest } from '@/services/verificationService';
+import ReadyToMint from '../ReadyToMint';
 
 interface ReviewSubmitStepProps {
   onNavigate?: (step: number) => void;
@@ -199,62 +195,15 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
   );
 }
 
-function ErrorState({ error, onRetry, onReset }: { error: string; onRetry: () => void; onReset: () => void; }) {
-  return (
-    <div className="w-full max-w-xl mx-auto space-y-6">
-      <div className="flex flex-col items-center text-center space-y-4 py-6">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-          <AlertCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Submission Failed</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md">{error}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          type="button"
-          onClick={onRetry}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-          Try Again
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          Start Over
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // --- MAIN COMPONENT ---
 
 export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) {
-  const {
-    formData,
-    isSubmitting,
-    submissionResult,
-    submissionError,
-    setIsSubmitting,
-    setSubmissionResult,
-    setSubmissionError,
-    resetWizard,
-  } = useWizardStore();
-
-  const [confirmed, setConfirmed] = useState(false);
-  const submissionLockRef = useRef(false);
+  const { formData, isSubmitting, submissionResult, resetWizard } = useWizardStore();
   const content = formData.content;
   const isEncrypted = content?.encryptionEnabled ?? true;
   const contentHashValid = isValidSHA256(content?.contentHash ?? '');
   const hasManifest = content?.manifest !== null && content?.manifest !== undefined;
   
-  const canSubmit = contentHashValid && confirmed && !isSubmitting && !submissionResult;
   const file = content?.file;
 
   // Generate thumbnail URL for images with safe Blob check
@@ -275,60 +224,11 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   };
 
-  const handleSubmit = useCallback(async () => {
-    if (!canSubmit || submissionLockRef.current) return;
-
-    submissionLockRef.current = true;
-    setIsSubmitting(true);
-    setSubmissionError(null);
-
-    try {
-      // Wallet Connection Check
-      const walletConnected = await isConnected();
-      if (!walletConnected) {
-        throw new Error('Wallet not connected. Please connect your Freighter wallet to continue.');
-      }
-
-      // Retrieve dynamic active public key using requestAccess (v6 API support)
-      const accessResponse = await requestAccess();
-      if (accessResponse.error) {
-        throw new Error(`Freighter error: ${accessResponse.error}`);
-      }
-
-      const activePublicKey = accessResponse.address;
-      if (!activePublicKey) {
-        throw new Error('Unable to retrieve public key from Freighter wallet.');
-      }
-
-      const result = await submitVerificationRequest(
-        content?.contentHash ?? '',
-        content?.manifestHash ?? null,
-        activePublicKey 
-      );
-
-      setSubmissionResult({
-        ...result,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      setSubmissionError(errorMessage);
-    } finally {
-      submissionLockRef.current = false;
-      setIsSubmitting(false);
-    }
-  }, [canSubmit, content, setIsSubmitting, setSubmissionResult, setSubmissionError]);
-
-  const handleRetry = useCallback(() => {
-    setSubmissionError(null);
-  }, [setSubmissionError]);
-
   const handleReset = useCallback(() => {
     resetWizard();
   }, [resetWizard]);
 
   if (submissionResult) return <SuccessState result={submissionResult} onReset={handleReset} />;
-  if (submissionError) return <ErrorState error={submissionError} onRetry={handleRetry} onReset={handleReset} />;
 
   return (
     <div className="w-full max-w-xl mx-auto space-y-4">
@@ -416,44 +316,11 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         )}
       </div>
 
-      {/* Confirmation & Submit */}
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-5 space-y-4 shadow-sm">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-            disabled={isSubmitting}
-            className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
-          />
-          <span className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-            I confirm that the information above is correct and I authorise the submission to the Stellar network.
-          </span>
-        </label>
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
-            canSubmit
-              ? 'bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              Submit Record
-            </>
-          )}
-        </button>
-      </div>
+      <ReadyToMint
+        contentHash={content?.contentHash ?? ''}
+        manifestHash={content?.manifestHash ?? null}
+        isReady={contentHashValid}
+      />
 
       {isSubmitting && <OverlaySpinner />}
     </div>
