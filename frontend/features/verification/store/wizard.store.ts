@@ -78,8 +78,6 @@ interface WizardState {
 }
 
 const defaultContent: UploadContentData = {
-  mediaCid: null,
-  manifestCid: null,
   file: null,
   contentHash: null,
   hashProgress: 0,
