@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Billing Dashboard (Table View)
+ *
+ * Implements the billing history dashboard UI based on Figma designs,
+ * fulfilling Issue #412:
+ * - Displays billing subscription card (plan, price, renewal date, verifications usage).
+ * - Displays billing history table with Date (issued & due), Amount, Plan / Line Item, and Status.
+ * - Handles live/sample data fallback gracefully with accessibility compliance.
+ */
+
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CreditCard, Receipt } from "lucide-react";
