@@ -1,26 +1,5 @@
-/**
- * Soroban contract event decoding for the client boundary.
- *
- * Ported from the backend TypeScript helper (`backend/src/utils/sorobanEvents.ts`)
- * so the frontend can decode the same XDR events returned by Soroban RPC
- * `getEvents` into JSON-safe, strongly typed objects.
- *
- * The implementation is browser-safe: it never relies on Node's `Buffer`
- * global. Byte values decoded by the Stellar SDK arrive as `Uint8Array`
- * (a `Buffer` in Node, which extends `Uint8Array`), so both environments work.
- */
-import { Address, StrKey, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { scValToNative, xdr } from '@stellar/stellar-sdk';
 
-export type SupportedSorobanEventName =
-  | "VerificationRequest"
-  | "Attestation"
-  | "CertificateMinted";
-
-/**
- * Minimal event shape the parser consumes. This mirrors the fields of a
- * Soroban RPC `getEvents` contract event, so RPC responses can be passed
- * through with little or no mapping.
- */
 export interface SorobanEventEnvelope {
   id: string;
   ledger: number;
@@ -30,279 +9,98 @@ export interface SorobanEventEnvelope {
   value: xdr.ScVal;
 }
 
-interface ParsedEventBase {
+export interface ParsedVerificationRequestEvent {
+  type: 'VerificationRequest';
   eventId: string;
   ledger: number;
-  txHash: string;
+  transactionHash: string;
   contractId?: string;
-}
-
-export interface ParsedVerificationRequestEvent extends ParsedEventBase {
-  type: "VerificationRequest";
   requestId: string;
-  contentHash: string;
+  contentHashHex: string;
   state?: string;
 }
 
-export interface ParsedAttestationEvent extends ParsedEventBase {
-  type: "Attestation";
-  requestId: string;
-  provider: string;
-  teeHash: string;
-}
-
-export interface ParsedCertificateMintedEvent extends ParsedEventBase {
-  type: "CertificateMinted";
-  owner: string;
-  certificateId: string;
-  manifestHash: string;
-}
-
-export type ParsedSorobanEvent =
-  | ParsedVerificationRequestEvent
-  | ParsedAttestationEvent
-  | ParsedCertificateMintedEvent;
-
-/**
- * Raised when a supported event cannot be decoded. Callers can render an
- * error state (or log/skip the page) using `eventId` without inspecting the
- * underlying XDR failure.
- */
 export class SorobanEventParseError extends Error {
-  constructor(
-    public readonly eventId: string,
-    message: string
-  ) {
-    super(`Soroban event ${eventId}: ${message}`);
-    this.name = "SorobanEventParseError";
-    Object.setPrototypeOf(this, SorobanEventParseError.prototype);
+  constructor(eventId: string, detail: string) {
+    super(`Soroban event ${eventId}: ${detail}`);
+    this.name = 'SorobanEventParseError';
   }
 }
 
-const EVENT_NAME_ALIASES: Readonly<Record<string, SupportedSorobanEventName>> = {
-  VerificationRequest: "VerificationRequest",
-  VerificationRequestEvent: "VerificationRequest",
-  verification_request: "VerificationRequest",
-  Attestation: "Attestation",
-  attestation: "Attestation",
-  CertificateMinted: "CertificateMinted",
-  certificate_minted: "CertificateMinted",
-};
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+function record(value: unknown): Record<string, unknown> {
+  if (value instanceof Map) return Object.fromEntries(value.entries()) as Record<string, unknown>;
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
 }
 
-function pick(record: Record<string, unknown>, ...keys: string[]): unknown {
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(record, key)) return record[key];
+function field(payload: Record<string, unknown>, ...names: string[]): unknown {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(payload, name)) return payload[name];
   }
   return undefined;
 }
 
-function requireString(value: unknown, field: string, eventId: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new SorobanEventParseError(eventId, `${field} must be a non-empty string`);
-  }
-  return value;
+function stringValue(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  return undefined;
 }
 
-function integerString(value: unknown, field: string, eventId: string): string {
-  if (typeof value === "bigint") {
-    if (value < BigInt(0)) {
-      throw new SorobanEventParseError(eventId, `${field} must be non-negative`);
-    }
-    return value.toString();
-  }
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
-    return String(value);
-  }
-  if (typeof value === "string" && /^\d+$/.test(value)) return value;
-  throw new SorobanEventParseError(eventId, `${field} must be a non-negative integer`);
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  let hex = "";
-  for (const byte of bytes) {
-    hex += byte.toString(16).padStart(2, "0");
-  }
-  return hex;
-}
-
-function bytes32Hex(value: unknown, field: string, eventId: string): string {
-  if (typeof value === "string" && /^[0-9a-fA-F]{64}$/.test(value)) {
-    return value.toLowerCase();
-  }
-
-  if (value instanceof Uint8Array) {
-    if (value.length === 32) return bytesToHex(value);
-  }
-
-  throw new SorobanEventParseError(eventId, `${field} must be exactly 32 bytes`);
-}
-
-function stellarAddress(value: unknown, field: string, eventId: string): string {
-  const candidate =
-    typeof value === "string"
-      ? value
-      : value instanceof Address
-        ? value.toString()
-        : null;
-
-  if (
-    candidate === null ||
-    (!StrKey.isValidEd25519PublicKey(candidate) && !StrKey.isValidContract(candidate))
-  ) {
-    throw new SorobanEventParseError(eventId, `${field} must be a valid Stellar address`);
+function requiredInteger(value: unknown, fieldName: string, eventId: string): string {
+  const candidate = stringValue(value);
+  if (!candidate || !/^\d+$/.test(candidate)) {
+    throw new SorobanEventParseError(eventId, `${fieldName} must be a non-negative integer`);
   }
   return candidate;
 }
 
-function common(event: SorobanEventEnvelope): ParsedEventBase {
-  if (!event.id || !Number.isInteger(event.ledger) || event.ledger < 0 || !event.txHash) {
-    throw new SorobanEventParseError(event.id || "<unknown>", "invalid event envelope");
+function bytes32(value: unknown, fieldName: string, eventId: string): string {
+  if (typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value)) return value.toLowerCase();
+  if (value instanceof Uint8Array && value.byteLength === 32) {
+    return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  throw new SorobanEventParseError(eventId, `${fieldName} must be exactly 32 bytes`);
+}
+
+function isVerificationRequestTopic(topic: xdr.ScVal[]): boolean {
+  return topic.some((entry) => {
+    const value = stringValue(scValToNative(entry));
+    return value === 'VerificationRequest' || value === 'VerificationRequestEvent';
+  });
+}
+
+/** Decode VerificationRequest events emitted by the Soroban Oracle contract. */
+export function parseVerificationRequestEvent(
+  event: SorobanEventEnvelope
+): ParsedVerificationRequestEvent | null {
+  if (!isVerificationRequestTopic(event.topic)) return null;
+  if (!event.id || !event.txHash || !Number.isSafeInteger(event.ledger) || event.ledger < 0) {
+    throw new SorobanEventParseError(event.id || '<unknown>', 'invalid event envelope');
   }
 
+  const payload = record(scValToNative(event.value));
+  const requestId = requiredInteger(
+    field(payload, 'request_id', 'requestId', 'id'),
+    'requestId',
+    event.id
+  );
+  const contentHashHex = bytes32(
+    field(payload, 'content_hash', 'contentHash'),
+    'contentHash',
+    event.id
+  );
+  const state = stringValue(field(payload, 'state'));
+
   return {
+    type: 'VerificationRequest',
     eventId: event.id,
     ledger: event.ledger,
-    txHash: event.txHash,
+    transactionHash: event.txHash,
     ...(event.contractId ? { contractId: event.contractId } : {}),
+    requestId,
+    contentHashHex,
+    ...(state ? { state } : {}),
   };
-}
-
-function decodeTopic(event: SorobanEventEnvelope): unknown[] {
-  try {
-    return event.topic.map((entry) => scValToNative(entry));
-  } catch {
-    throw new SorobanEventParseError(event.id, "topic XDR could not be decoded");
-  }
-}
-
-function decodeValue(event: SorobanEventEnvelope): unknown {
-  try {
-    return scValToNative(event.value);
-  } catch {
-    throw new SorobanEventParseError(event.id, "value XDR could not be decoded");
-  }
-}
-
-function eventName(topic: unknown[]): SupportedSorobanEventName | null {
-  for (const entry of topic) {
-    if (typeof entry === "string" && EVENT_NAME_ALIASES[entry]) {
-      return EVENT_NAME_ALIASES[entry];
-    }
-  }
-  return null;
-}
-
-function payloadRecord(value: unknown, eventId: string): Record<string, unknown> {
-  const record = asRecord(value);
-  if (!record) {
-    throw new SorobanEventParseError(eventId, "event payload must decode to a struct/map");
-  }
-  return record;
-}
-
-function parseVerificationRequest(
-  event: SorobanEventEnvelope,
-  value: unknown
-): ParsedVerificationRequestEvent {
-  const payload = payloadRecord(value, event.id);
-  const state = pick(payload, "state");
-
-  return {
-    ...common(event),
-    type: "VerificationRequest",
-    requestId: integerString(pick(payload, "request_id", "requestId", "id"), "requestId", event.id),
-    contentHash: bytes32Hex(
-      pick(payload, "content_hash", "contentHash"),
-      "contentHash",
-      event.id
-    ),
-    ...(state === undefined ? {} : { state: requireString(state, "state", event.id) }),
-  };
-}
-
-function parseAttestation(
-  event: SorobanEventEnvelope,
-  value: unknown
-): ParsedAttestationEvent {
-  const payload = payloadRecord(value, event.id);
-
-  return {
-    ...common(event),
-    type: "Attestation",
-    requestId: integerString(
-      pick(payload, "request_id", "requestId"),
-      "requestId",
-      event.id
-    ),
-    provider: bytes32Hex(pick(payload, "provider"), "provider", event.id),
-    teeHash: bytes32Hex(pick(payload, "tee_hash", "teeHash"), "teeHash", event.id),
-  };
-}
-
-function parseCertificateMinted(
-  event: SorobanEventEnvelope,
-  topic: unknown[],
-  value: unknown
-): ParsedCertificateMintedEvent {
-  const payload = asRecord(value);
-  const nameIndex = topic.findIndex(
-    (entry) =>
-      typeof entry === "string" &&
-      EVENT_NAME_ALIASES[entry] === "CertificateMinted"
-  );
-  const fields = nameIndex >= 0 ? topic.slice(nameIndex + 1) : [];
-
-  const owner = payload ? pick(payload, "owner") : fields[0];
-  const certificateId = payload
-    ? pick(payload, "certificate_id", "certificateId")
-    : fields[1];
-  const manifestHash = payload
-    ? pick(payload, "manifest_hash", "manifestHash")
-    : fields[2];
-
-  return {
-    ...common(event),
-    type: "CertificateMinted",
-    owner: stellarAddress(owner, "owner", event.id),
-    certificateId: integerString(certificateId, "certificateId", event.id),
-    manifestHash: requireString(manifestHash, "manifestHash", event.id),
-  };
-}
-
-/**
- * Decode supported Soroban contract events into strongly typed, JSON-safe
- * objects. Unknown event names are skipped; malformed supported events fail
- * closed with `SorobanEventParseError`.
- */
-export function parseSorobanEvents(
-  events: readonly SorobanEventEnvelope[]
-): ParsedSorobanEvent[] {
-  const parsed: ParsedSorobanEvent[] = [];
-
-  for (const event of events) {
-    const topic = decodeTopic(event);
-    const name = eventName(topic);
-    if (name === null) continue;
-
-    const value = decodeValue(event);
-    switch (name) {
-      case "VerificationRequest":
-        parsed.push(parseVerificationRequest(event, value));
-        break;
-      case "Attestation":
-        parsed.push(parseAttestation(event, value));
-        break;
-      case "CertificateMinted":
-        parsed.push(parseCertificateMinted(event, topic, value));
-        break;
-    }
-  }
-
-  return parsed;
 }

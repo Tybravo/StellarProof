@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Networks, Operation, TransactionBuilder, Horizon, BASE_FEE, Asset, Memo } from "@stellar/stellar-sdk";
 import { signTransaction, requestAccess } from "@stellar/freighter-api";
 import { CheckCircle2, Loader2, Wallet, XCircle } from "lucide-react";
+import TransactionStatusAnimation from "./TransactionStatusAnimation";
 
 interface XLMCheckoutModalProps {
   isOpen: boolean;
@@ -99,7 +100,23 @@ export default function XLMCheckoutModal({
           <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-white/10"><span className="font-semibold text-gray-900 dark:text-white">Total</span><span className="text-xl font-bold text-primary">{totalXLM} XLM</span></div>
         </div>
 
-        {message && <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">{message}{txHash && <p className="mt-2 break-all font-mono text-xs text-green-600 dark:text-green-400">Tx: {txHash}</p>}</div>}
+        {message && (
+          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">
+            {(status === "success" || status === "error") && (
+              <div className="mb-3 flex justify-center">
+                <TransactionStatusAnimation status={status} size={52} />
+              </div>
+            )}
+            <p className={status === "success" ? "text-center font-medium text-emerald-600 dark:text-emerald-400" : status === "error" ? "text-center text-red-600 dark:text-red-400" : ""}>
+              {message}
+            </p>
+            {txHash && (
+              <p className="mt-2 break-all text-center font-mono text-xs text-emerald-600 dark:text-emerald-400">
+                Tx: {txHash}
+              </p>
+            )}
+          </div>
+        )}
 
         <button type="button" onClick={handlePayment} disabled={status === "signing" || status === "success"} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">
           {status === "signing" ? <Loader2 className="h-5 w-5 animate-spin" /> : status === "success" ? <CheckCircle2 className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}
