@@ -8,6 +8,10 @@ import { useWallet } from "@/context/WalletContext";
 
 export default function SealedProvenanceVaultPage() {
   const { publicKey } = useWallet();
+  return <WalletVault key={publicKey ?? "disconnected"} publicKey={publicKey ?? undefined} />;
+}
+
+function WalletVault({ publicKey }: { publicKey?: string }) {
   const [assets, setAssets] = useState<DigitalAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,8 +21,6 @@ export default function SealedProvenanceVaultPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
     fetchAssets(publicKey ?? undefined)
       .then((data) => {
         if (!cancelled) setAssets(data.filter((asset) => asset.kmsEncryptionStatus === "encrypted"));
