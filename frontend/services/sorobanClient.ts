@@ -11,11 +11,11 @@ export const NETWORK_PASSPHRASE =
   StellarSDK.Networks.TESTNET;
 
 /**
- * Creates a new Stellar SDK Contract instance bound to the configured contract ID
- * and the correct network passphrase.
+ * Creates a new Stellar SDK Contract instance for the configured contract ID.
  *
- * Callers should use this factory so every call site uses the same network
- * configuration and avoids mismatched network errors.
+ * Callers should use this factory so every call site targets the same contract
+ * and the exported NETWORK_PASSPHRASE when building transactions, which avoids
+ * mismatched network errors.
  */
 export function createContract(): StellarSDK.Contract {
   if (!CONTRACT_ID) {
@@ -24,7 +24,5 @@ export function createContract(): StellarSDK.Contract {
     );
   }
 
-  return new StellarSDK.Contract(CONTRACT_ID, {
-    networkPassphrase: NETWORK_PASSPHRASE,
-  });
+  return new StellarSDK.Contract(CONTRACT_ID);
 }
