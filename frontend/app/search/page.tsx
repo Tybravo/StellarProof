@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../components/Header";
+import NoResultsState from "../../components/search/NoResultsState";
 import {
   fetchAllCertificates,
   searchCertificates,
@@ -288,7 +289,12 @@ export default function SearchPage() {
         )}
 
         {/* ─── Results view (list or grid) ──────────────────────────── */}
-        {viewMode === "list" ? (
+        {error ? null : !loading && results.length === 0 ? (
+          <NoResultsState
+            query={query.trim()}
+            onClearFilters={query.trim() ? handleClearSearch : undefined}
+          />
+        ) : viewMode === "list" ? (
           <ListView
             results={results}
             isLoading={loading}
