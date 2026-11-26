@@ -13,8 +13,6 @@ The frontend uses ESLint with the Next.js Core Web Vitals and Next.js TypeScript
 | `frontend/package.json` | Frontend lint script and development dependencies |
 | `package.json` | Root package scripts and lint-staged configuration |
 | `.github/workflows/ci.yml` | Frontend linting in GitHub Actions |
-| `.husky/pre-commit` | Pre-commit hook |
-| `.husky/pre-push` | Pre-push hook |
 
 ## 2. ESLint Configuration
 
@@ -30,9 +28,7 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
@@ -156,7 +152,7 @@ frontend/tsconfig.json
 
 The production Next.js build also performs framework build checks, including TypeScript checks where applicable.
 
-## 6. Pre-commit Workflow
+## 6. Automated Code Quality Checks
 
 The root `package.json` configures `lint-staged` for frontend TypeScript files:
 
@@ -170,16 +166,9 @@ The root `package.json` configures `lint-staged` for frontend TypeScript files:
 }
 ```
 
-This means matching staged `.ts` and `.tsx` files can be passed through ESLint's automatic fixes when the configured lint-staged workflow is invoked.
+This configuration allows matching staged `.ts` and `.tsx` files to be processed by ESLint when the configured lint-staged workflow is invoked.
 
-The repository also contains:
-
-```text
-.husky/pre-commit
-.husky/pre-push
-```
-
-Check the current hook scripts before relying on a particular hook behavior. The presence of a hook file does not by itself mean every quality check is automatically executed by that hook.
+Review the repository's package scripts and automation configuration to understand which quality checks are enabled.
 
 ## 7. Continuous Integration
 
