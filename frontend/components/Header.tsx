@@ -7,6 +7,7 @@ import { WalletModal } from "./WalletModal";
 import ThemeToggle from "./ThemeToggle";
 import NetworkBadge from "./wallet/NetworkBadge";
 import WrongNetworkWarning from "./wallet/WrongNetworkWarning";
+import { GlobalSearchBar } from "./search/GlobalSearchBar";
 
 const NAV_LINKS = [
   { href: "#home", label: "Home" },
@@ -250,6 +251,9 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <div className="hidden md:block w-44 xl:w-60">
+            <GlobalSearchBar />
+          </div>
           <NetworkBadge />
           <ThemeToggle />
           <div className="hidden sm:block">
@@ -286,6 +290,9 @@ export default function Header() {
             className="overflow-hidden border-t border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue/98 lg:hidden transition-colors duration-300"
           >
             <nav className="border-t border-gray-200 dark:border-white/10 bg-white dark:bg-darkblue px-4 py-4 transition-colors duration-300">
+              <div className="mb-3 md:hidden">
+                <GlobalSearchBar onSelectResult={() => setMobileOpen(false)} />
+              </div>
               <ul className="flex flex-col gap-1">
                 {NAV_LINKS.map((item) =>
                   "href" in item ? (
