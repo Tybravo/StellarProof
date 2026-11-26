@@ -44,6 +44,7 @@ interface WizardState {
   ) => void;
 
   // Upload content helpers (convenience setters)
+  setVerificationCids: (mediaCid: string, manifestCid: string | null) => void;
   setUploadFile: (file: UploadContentData['file']) => void;
   setContentHash: (hash: string | null) => void;
   setHashProgress: (progress: number) => void;
@@ -155,11 +156,19 @@ export const useWizardStore = create<WizardState>()(
       //
       // Upload content helpers
       //
+      setVerificationCids: (mediaCid, manifestCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: { ...defaultContent, ...state.formData.content, mediaCid, manifestCid },
+          },
+        })),
+
       setUploadFile: (file) =>
         set((state) => ({
           formData: {
             ...state.formData,
-            content: { ...defaultContent, ...state.formData.content, file },
+            content: { ...defaultContent, ...state.formData.content, file, mediaCid: null, manifestCid: null },
           },
         })),
 
@@ -191,7 +200,7 @@ export const useWizardStore = create<WizardState>()(
         set((state) => ({
           formData: {
             ...state.formData,
-            content: { ...defaultContent, ...state.formData.content, manifest, manifestHash },
+            content: { ...defaultContent, ...state.formData.content, manifest, manifestHash, manifestCid: null },
           },
         })),
 
