@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   Edit2,
@@ -19,6 +19,7 @@ import {
 import { useWizardStore, SubmissionResult } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
 import CopyToClipboard from '@/components/ui/CopyToClipboard';
+import { SignPromptModal } from '@/components/wallet/SignPromptModal';
 import ReadyToMint from '../ReadyToMint';
 
 interface ReviewSubmitStepProps {
@@ -169,6 +170,7 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
 
 export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) {
   const { formData, isSubmitting, submissionResult, resetWizard } = useWizardStore();
+  const [showSignPrompt, setShowSignPrompt] = useState(false);
 
   const content = formData.content;
   const isEncrypted = content?.encryptionEnabled ?? true;
@@ -294,6 +296,7 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         contentHash={content?.contentHash ?? ''}
         manifestHash={content?.manifestHash ?? null}
         isReady={contentHashValid}
+        onSigningChange={setShowSignPrompt}
       />
 
       {isSubmitting && !showSignPrompt && <OverlaySpinner />}

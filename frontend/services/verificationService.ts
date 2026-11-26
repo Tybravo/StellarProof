@@ -1,6 +1,7 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { signWithFreighter, transactionErrorMessage } from '@/hooks/useSignTransaction';
+import { signTransaction } from '@stellar/freighter-api';
 import { walletService } from './wallet';
+import { MINTING_UNAVAILABLE_MESSAGE, WALLET_MINTING_ENABLED } from '@/config/minting';
 
 export interface SubmissionResult {
   txHash: string;
@@ -46,6 +47,11 @@ export const submitVerificationRequest = async (
   publicKey: string,
   onSigningChange?: (signing: boolean) => void
 ): Promise<SubmissionResult> => {
+  // Refuse before anything is built, signed or sent.
+  if (!WALLET_MINTING_ENABLED) {
+    throw new VerificationSubmissionError(MINTING_UNAVAILABLE_MESSAGE, 'configuration');
+  }
+
   try {
     if (!CONTRACT_ID) {
       throw new Error('Soroban contract ID not configured. Please check your environment variables.');
@@ -82,6 +88,19 @@ export const submitVerificationRequest = async (
       .setTimeout(30)
       .build();
 
+    // Sign with Freighter
+    let signedResult: unknown;
+    onSigningChange?.(true);
+    try {
+      signedResult = await signTransaction(transaction.toXDR(), {
+        address: publicKey,
+        networkPassphrase,
+      });
+    } finally {
+      onSigningChange?.(false);
+    }
+
+    // Extract the signed XDR string
     let signedXDR: string;
     if (typeof signedResult === 'string') {
       signedXDR = signedResult;

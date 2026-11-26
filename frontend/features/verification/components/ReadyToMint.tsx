@@ -9,12 +9,15 @@ import {
   VerificationSubmissionError,
   type SubmissionFailureKind,
 } from '@/services/verificationService';
+import { MINTING_UNAVAILABLE_MESSAGE, WALLET_MINTING_ENABLED } from '@/config/minting';
 
 export interface ReadyToMintProps {
   contentHash: string;
   manifestHash: string | null;
   /** Whether the content hash is valid and minting may be attempted. */
   isReady: boolean;
+  /** Called when Freighter signing starts or ends. */
+  onSigningChange?: (signing: boolean) => void;
 }
 
 interface MintFailure {
@@ -92,7 +95,12 @@ export function MintFailureNotice({
  * Final confirmation + mint action. Owns the wallet/sign/submit sequence and
  * shows a recoverable error UI if any part of the mint transaction fails.
  */
-export default function ReadyToMint({ contentHash, manifestHash, isReady }: ReadyToMintProps) {
+export default function ReadyToMint({
+  contentHash,
+  manifestHash,
+  isReady,
+  onSigningChange,
+}: ReadyToMintProps) {
   const {
     isSubmitting,
     submissionResult,
@@ -107,7 +115,8 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
   const [failureKind, setFailureKind] = useState<SubmissionFailureKind>('unknown');
   const lockRef = useRef(false);
 
-  const canSubmit = isReady && confirmed && !isSubmitting && !submissionResult;
+  const canSubmit =
+    WALLET_MINTING_ENABLED && isReady && confirmed && !isSubmitting && !submissionResult;
 
   const handleMint = useCallback(async () => {
     if (!canSubmit || lockRef.current) return;
@@ -135,16 +144,22 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
         throw new VerificationSubmissionError('Unable to retrieve public key from Freighter wallet.', 'unknown');
       }
 
-      const result = await submitVerificationRequest(contentHash, manifestHash, activePublicKey);
+      const result = await submitVerificationRequest(
+        contentHash,
+        manifestHash,
+        activePublicKey,
+        onSigningChange
+      );
       setSubmissionResult({ ...result, timestamp: new Date().toISOString() });
     } catch (error) {
       setFailureKind(error instanceof VerificationSubmissionError ? error.kind : 'unknown');
       setSubmissionError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
+      onSigningChange?.(false);
       lockRef.current = false;
       setIsSubmitting(false);
     }
-  }, [canSubmit, contentHash, manifestHash, setIsSubmitting, setSubmissionResult, setSubmissionError]);
+  }, [canSubmit, contentHash, manifestHash, onSigningChange, setIsSubmitting, setSubmissionResult, setSubmissionError]);
 
   if (submissionError) {
     return (
@@ -160,12 +175,22 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
 
   return (
     <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+      {!WALLET_MINTING_ENABLED && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <p className="text-xs text-amber-800 dark:text-amber-200">{MINTING_UNAVAILABLE_MESSAGE}</p>
+        </div>
+      )}
+
       <label className="flex cursor-pointer items-start gap-3">
         <input
           type="checkbox"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
-          disabled={isSubmitting}
+          disabled={!WALLET_MINTING_ENABLED || isSubmitting}
           className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 accent-blue-600"
         />
         <span className="text-xs leading-relaxed text-gray-700 dark:text-gray-300">

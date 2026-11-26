@@ -11,6 +11,9 @@ jest.mock('@stellar/freighter-api', () => ({
   requestAccess: jest.fn().mockResolvedValue({ address: 'GDUMMYPUBLICKEY' }),
 }));
 
+// Keep covering the mint UI flow while the real switch is off.
+jest.mock('@/config/minting', () => ({ WALLET_MINTING_ENABLED: true, MINTING_UNAVAILABLE_MESSAGE: '' }));
+
 jest.mock('@/services/verificationService', () => {
   class VerificationSubmissionError extends Error {
     kind: string;
@@ -115,7 +118,7 @@ describe('ReadyToMint', () => {
     render(<ReadyToMint contentHash={HASH} manifestHash="mh" isReady />);
     await confirmAndSubmit(user);
     await waitFor(() => expect(useWizardStore.getState().submissionResult?.txHash).toBe('tx1'));
-    expect(mockedSubmit).toHaveBeenCalledWith(HASH, 'mh', 'GDUMMYPUBLICKEY');
+    expect(mockedSubmit).toHaveBeenCalledWith(HASH, 'mh', 'GDUMMYPUBLICKEY', undefined);
   });
 
   it('shows a categorised error UI when the transaction fails on-chain, and can retry', async () => {

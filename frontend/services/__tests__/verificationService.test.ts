@@ -2,6 +2,8 @@ const mockSign = jest.fn();
 const mockSubmit = jest.fn();
 
 jest.mock('@stellar/freighter-api', () => ({ signTransaction: (...a: unknown[]) => mockSign(...a) }));
+// Keep covering the submission pipeline while the real switch is off.
+jest.mock('@/config/minting', () => ({ WALLET_MINTING_ENABLED: true, MINTING_UNAVAILABLE_MESSAGE: '' }));
 jest.mock('../wallet', () => ({
   walletService: { getNetworkDetails: jest.fn().mockResolvedValue(null) },
 }));
@@ -53,6 +55,27 @@ describe('submitVerificationRequest failure handling', () => {
   it('returns the hash on success', async () => {
     mockSubmit.mockResolvedValue({ hash: 'abcdef1234', result_xdr: 'x' });
     await expect(submitVerificationRequest('h', null, 'G')).resolves.toMatchObject({ txHash: 'abcdef1234' });
+  });
+
+  it('signs the built transaction for the connected account and reports signing progress', async () => {
+    mockSubmit.mockResolvedValue({ hash: 'abcdef1234', result_xdr: 'x' });
+    const onSigningChange = jest.fn();
+    await submitVerificationRequest('h', null, 'G', onSigningChange);
+    expect(mockSign).toHaveBeenCalledWith('XDR', {
+      address: 'G',
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+    expect(onSigningChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('ends signing progress and submits nothing when signing throws', async () => {
+    mockSign.mockRejectedValue(new Error('User declined access'));
+    const onSigningChange = jest.fn();
+    await expect(submitVerificationRequest('h', null, 'G', onSigningChange)).rejects.toMatchObject({
+      kind: 'user_rejected',
+    });
+    expect(onSigningChange.mock.calls).toEqual([[true], [false]]);
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
   it('classifies Horizon result codes as on-chain failures', async () => {

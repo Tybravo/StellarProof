@@ -27,6 +27,8 @@ export interface MintedCertificate {
   mintedAt: string;
 }
 
+export type VerificationStage = 'Idle' | 'Requested' | 'Processing' | 'Attested' | 'Minted' | 'Failed';
+
 interface WizardState {
   verificationStage: VerificationStage;
   setVerificationStage: (stage: VerificationStage) => void;
@@ -312,6 +314,7 @@ export const useWizardStore = create<WizardState>()(
       resetWizard: () =>
         set({
           ...clearedWizardState,
+          verificationStage: 'Idle',
           applicationStatus: 'Draft',
           mintedCertificate: null,
           mintError: null,
