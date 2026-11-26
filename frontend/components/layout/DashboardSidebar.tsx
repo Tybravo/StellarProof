@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
   Package,
+  Award,
   Receipt,
   Settings,
   LogOut,
@@ -27,6 +28,7 @@ interface SidebarLink {
 const LINKS: SidebarLink[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/assets", label: "Assets", icon: Package },
+  { href: "/dashboard/certificates", label: "Certificates", icon: Award },
   { href: "/dashboard/billing", label: "Billing", icon: Receipt },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

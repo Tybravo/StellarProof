@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useCallback, useState, useRef, type DragEvent, type ChangeEvent } from 'react';
-import { Upload, FileImage, FileVideo, FileText, X, AlertCircle, CheckCircle2, Loader2, Eye } from 'lucide-react';
+import { Upload, FileImage, FileVideo, FileText, X, AlertCircle, CheckCircle2, Loader2, Eye, Copy, Check } from 'lucide-react';
 import {
   DEFAULT_MAX_MEDIA_SIZE,
   DEFAULT_MEDIA_ACCEPT,
   validateMediaFile,
 } from '../../mediaValidation';
+import { hashFile } from '@/utils/hashing';
 
 // ── Types ──────────────────────────────────────────────────
 export interface MediaFile {
@@ -18,6 +19,14 @@ export interface MediaFile {
   progress: number;
   status: 'pending' | 'uploading' | 'done' | 'error';
   error?: string;
+  /** Lowercase hex SHA-256 of the file, computed locally in the browser. */
+  hash?: string;
+  /** State of the local hash calculation. */
+  hashStatus?: 'hashing' | 'done' | 'error';
+  /** Hashing progress (0-100). */
+  hashProgress?: number;
+  /** User-facing message when hashing failed. */
+  hashError?: string;
 }
 
 export interface MediaUploadStepProps {
@@ -77,6 +86,7 @@ export default function MediaUploadStep({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Use external files if controlled mode
   const files = externalFiles ?? internalFiles;
@@ -94,6 +104,26 @@ export default function MediaUploadStep({
       }
     },
     [externalFiles, onFilesChange],
+  );
+
+  // Compute the SHA-256 locally (Web Crypto, no server round-trip) and track it per file.
+  const hashAndTrack = useCallback(
+    async (fileId: string, file: File) => {
+      const patch = (changes: Partial<MediaFile>) =>
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, ...changes } : f)));
+
+      patch({ hashStatus: 'hashing', hashProgress: 0, hash: undefined, hashError: undefined });
+      try {
+        const hash = await hashFile(file, (percent) => patch({ hashProgress: percent }));
+        patch({ hash, hashStatus: 'done', hashProgress: 100 });
+      } catch {
+        patch({
+          hashStatus: 'error',
+          hashError: 'Could not calculate the SHA-256 hash. You can still continue with the upload.',
+        });
+      }
+    },
+    [setFiles],
   );
 
   const simulateUpload = useCallback(async (fileId: string) => {
@@ -164,11 +194,13 @@ export default function MediaUploadStep({
       }
 
       // Simulate upload progress (in real app this would be actual upload)
-      for (const entry of newEntries) {
-        await simulateUpload(entry.id);
+      // Hash each file locally first so the digest is visible before the upload starts.
+      for (let i = 0; i < newEntries.length; i++) {
+        await hashAndTrack(newEntries[i].id, validFiles[i]);
+        await simulateUpload(newEntries[i].id);
       }
     },
-    [maxSize, accept, multiple, files, setFiles, simulateUpload],
+    [maxSize, accept, multiple, files, setFiles, simulateUpload, hashAndTrack],
   );
 
 
@@ -245,6 +277,16 @@ export default function MediaUploadStep({
   );
 
   // ── Render ────────────────────────────────────────────
+  const handleCopyHash = useCallback(async (fileId: string, hash: string) => {
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopiedId(fileId);
+      setTimeout(() => setCopiedId((current) => (current === fileId ? null : current)), 2000);
+    } catch {
+      setCopiedId(null);
+    }
+  }, []);
+
   const hasFiles = files.length > 0;
   const showDropZone = multiple || !hasFiles;
 
@@ -394,6 +436,55 @@ export default function MediaUploadStep({
                         {getFileCategory(file.type)}
                       </span>
                     </div>
+
+                    {/* SHA-256 Hash Preview */}
+                    {file.hashStatus === 'hashing' && (
+                      <div
+                        className="mt-3 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"
+                        role="status"
+                        data-testid={`hash-loading-${file.id}`}
+                      >
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                        <span>Calculating SHA-256… {file.hashProgress ?? 0}%</span>
+                      </div>
+                    )}
+                    {file.hashStatus === 'done' && file.hash && (
+                      <div
+                        className="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-2"
+                        data-testid={`hash-preview-${file.id}`}
+                      >
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">SHA-256</p>
+                        <div className="mt-1 flex items-start gap-2">
+                          <code
+                            className="min-w-0 flex-1 break-all text-xs font-mono text-gray-800 dark:text-gray-200"
+                            data-testid={`hash-value-${file.id}`}
+                          >
+                            {file.hash}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyHash(file.id, file.hash as string)}
+                            aria-label={`Copy SHA-256 hash for ${file.name}`}
+                            data-testid={`hash-copy-${file.id}`}
+                            className="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                          >
+                            {copiedId === file.id ? (
+                              <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {file.hashStatus === 'error' && (
+                      <p
+                        className="mt-3 text-xs text-amber-700 dark:text-amber-400"
+                        data-testid={`hash-error-${file.id}`}
+                      >
+                        {file.hashError ?? 'Could not calculate the SHA-256 hash.'}
+                      </p>
+                    )}
 
                     {/* Progress Bar */}
                     {file.status === 'uploading' && (
