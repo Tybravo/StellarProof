@@ -7,6 +7,9 @@ import { useWallet } from "@/context/WalletContext";
 import { useAssetPagination } from "@/hooks/useAssetPagination";
 import { fetchMockAssetPage } from "@/services/assetsMock";
 import AssetTable from "./components/AssetTable";
+import AssetGrid from "./components/AssetGrid";
+
+type ViewMode = "table" | "grid";
 
 export default function AssetsPage() {
   const { publicKey } = useWallet();

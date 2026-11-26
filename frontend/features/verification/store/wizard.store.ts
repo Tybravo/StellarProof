@@ -18,17 +18,18 @@ export interface SubmissionResult {
   timestamp: string;
 }
 
-export type VerificationWorkflowStage = 'Idle' | 'Requested' | 'Processing' | 'Attested' | 'Minted' | 'Failed';
+/** Lifecycle of the verification application as tracked by the wizard. */
+export type ApplicationStatus = 'Draft' | 'Minting' | 'Minted';
 
-export interface VerificationProgressState {
-  stage: VerificationWorkflowStage;
-  requestId: string | null;
-  transactionHash: string | null;
+export interface MintedCertificate {
+  certificateId: string;
+  txHash: string;
+  mintedAt: string;
 }
 
 interface WizardState {
-  verificationProgress: VerificationProgressState;
-  setVerificationProgress: (progress: Partial<VerificationProgressState>) => void;
+  verificationStage: VerificationStage;
+  setVerificationStage: (stage: VerificationStage) => void;
   // Navigation
   currentStep: number;
   setStep: (step: number) => void;
@@ -43,6 +44,7 @@ interface WizardState {
   ) => void;
 
   // Upload content helpers (convenience setters)
+  setVerificationCids: (mediaCid: string, manifestCid: string | null) => void;
   setUploadFile: (file: UploadContentData['file']) => void;
   setContentHash: (hash: string | null) => void;
   setHashProgress: (progress: number) => void;
@@ -63,6 +65,17 @@ interface WizardState {
   setIsSubmitting: (submitting: boolean) => void;
   setSubmissionResult: (result: SubmissionResult | null) => void;
   setSubmissionError: (error: string | null) => void;
+
+  // Minting
+  applicationStatus: ApplicationStatus;
+  mintedCertificate: MintedCertificate | null;
+  mintError: string | null;
+  /** Marks a mint as in flight and clears any previous mint error. */
+  startMint: () => void;
+  /** Records a failed mint. Wizard data is kept so the user can retry. */
+  failMint: (error: string) => void;
+  /** On success: clears wizard data and moves the application to "Minted". */
+  completeMint: (certificate: MintedCertificate) => void;
 
   // Validation
   validation: Record<number, boolean>;
@@ -91,6 +104,16 @@ const defaultContent: UploadContentData = {
   ipfsError: null,
 };
 
+/** Wizard data that is discarded on both a manual reset and a completed mint. */
+const clearedWizardState = {
+  currentStep: 0,
+  formData: {} as WizardFormData,
+  validation: {} as Record<number, boolean>,
+  isSubmitting: false,
+  submissionResult: null,
+  submissionError: null,
+};
+
 //
 // ---- STORE ----
 //
@@ -98,11 +121,8 @@ const defaultContent: UploadContentData = {
 export const useWizardStore = create<WizardState>()(
   persist(
     (set) => ({
-      verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
-      setVerificationProgress: (progress) =>
-        set((state) => ({
-          verificationProgress: { ...state.verificationProgress, ...progress },
-        })),
+      verificationStage: 'Idle',
+      setVerificationStage: (verificationStage) => set({ verificationStage }),
       //
       // Navigation
       //
@@ -136,11 +156,19 @@ export const useWizardStore = create<WizardState>()(
       //
       // Upload content helpers
       //
+      setVerificationCids: (mediaCid, manifestCid) =>
+        set((state) => ({
+          formData: {
+            ...state.formData,
+            content: { ...defaultContent, ...state.formData.content, mediaCid, manifestCid },
+          },
+        })),
+
       setUploadFile: (file) =>
         set((state) => ({
           formData: {
             ...state.formData,
-            content: { ...defaultContent, ...state.formData.content, file },
+            content: { ...defaultContent, ...state.formData.content, file, mediaCid: null, manifestCid: null },
           },
         })),
 
@@ -172,7 +200,7 @@ export const useWizardStore = create<WizardState>()(
         set((state) => ({
           formData: {
             ...state.formData,
-            content: { ...defaultContent, ...state.formData.content, manifest, manifestHash },
+            content: { ...defaultContent, ...state.formData.content, manifest, manifestHash, manifestCid: null },
           },
         })),
 
@@ -247,6 +275,25 @@ export const useWizardStore = create<WizardState>()(
       setSubmissionError: (submissionError) => set({ submissionError, submissionResult: null }),
 
       //
+      // Minting
+      //
+      applicationStatus: 'Draft',
+      mintedCertificate: null,
+      mintError: null,
+
+      startMint: () => set({ applicationStatus: 'Minting', mintError: null }),
+
+      failMint: (mintError) => set({ applicationStatus: 'Draft', mintError }),
+
+      completeMint: (mintedCertificate) =>
+        set({
+          ...clearedWizardState,
+          applicationStatus: 'Minted',
+          mintedCertificate,
+          mintError: null,
+        }),
+
+      //
       // Validation
       //
       validation: {},
@@ -264,13 +311,10 @@ export const useWizardStore = create<WizardState>()(
       //
       resetWizard: () =>
         set({
-          currentStep: 0,
-          formData: {},
-          validation: {},
-          isSubmitting: false,
-          submissionResult: null,
-          submissionError: null,
-          verificationProgress: { stage: 'Idle', requestId: null, transactionHash: null },
+          ...clearedWizardState,
+          applicationStatus: 'Draft',
+          mintedCertificate: null,
+          mintError: null,
         }),
 
       //

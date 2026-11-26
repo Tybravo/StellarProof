@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchTransactionStatus, getExplorerUrl, TxStatus } from '../../services/transactionService';
+import CopyToClipboard from '../ui/CopyToClipboard';
 import { useToast } from '../../app/context/ToastContext';
 
 export interface TransactionTrackerProps {
@@ -89,6 +90,7 @@ function TransactionTrackerInner({
 
       <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 break-all">
         <span className="font-mono">{hash}</span>
+        <CopyToClipboard value={hash} label="transaction hash" />
         <a
           href={getExplorerUrl(hash)}
           target="_blank"
