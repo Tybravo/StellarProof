@@ -31,6 +31,12 @@ export interface ManifestData {
 export interface SPVResult {
   encryptedHash: string;
   storageId: string;
+  verified?: boolean;
+  contentHashHex?: string;
+  manifestHashHex?: string;
+  signatureHex?: string;
+  spvId?: string;
+  providerPublicKeyHex?: string;
 }
 
 export interface UploadContentData {
@@ -43,6 +49,11 @@ export interface UploadContentData {
   manifestHash: string | null;
   encryptionEnabled: boolean;
   spvResult: SPVResult | null;
+  // IPFS integration
+  mediaCid?: string | null;
+  manifestCid?: string | null;
+  isIpfsUploading?: boolean;
+  ipfsError?: string | null;
 }
 
 export interface WizardFormData {

@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { useWallet } from "@/context/WalletContext";
 import { fetchAssets, type DigitalAsset } from "@/services/assetsMock";
 import AssetTable from "./components/AssetTable";
+import AssetsTable from "@/components/dashboard/AssetsTable";
 
 export default function AssetsPage() {
   const { publicKey } = useWallet();
@@ -43,6 +44,10 @@ export default function AssetsPage() {
         </p>
 
         <AssetTable assets={assets} isLoading={isLoading} />
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Sort by date or status</h2>
+          <AssetsTable assets={assets} isLoading={isLoading} />
+        </div>
       </main>
     </div>
   );

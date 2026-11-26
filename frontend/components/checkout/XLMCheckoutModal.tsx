@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Networks, Operation, TransactionBuilder, Horizon, BASE_FEE, Asset, Memo } from "@stellar/stellar-sdk";
 import { signTransaction, requestAccess } from "@stellar/freighter-api";
 import { CheckCircle2, Loader2, Wallet, XCircle } from "lucide-react";
+import TransactionStatusAnimation from "./TransactionStatusAnimation";
+import { useToast } from "@/context/ToastContext";
 
 interface XLMCheckoutModalProps {
   isOpen: boolean;
@@ -22,11 +24,53 @@ const DEFAULT_MERCHANT_ADDRESS = process.env.NEXT_PUBLIC_CHECKOUT_MERCHANT_ADDRE
 function getSignedXdr(result: unknown): string {
   if (typeof result === "string") return result;
   if (result && typeof result === "object") {
-    const maybe = result as { signedTxXdr?: string; signedTransaction?: string };
+    const maybe = result as {
+      signedTxXdr?: string;
+      signedTransaction?: string;
+      error?: string | { message?: string };
+    };
+    if (maybe.error) {
+      const errMsg = typeof maybe.error === "string" ? maybe.error : maybe.error.message || "Signing rejected";
+      throw new Error(errMsg);
+    }
     if (maybe.signedTxXdr) return maybe.signedTxXdr;
     if (maybe.signedTransaction) return maybe.signedTransaction;
   }
   throw new Error("Freighter did not return a signed transaction.");
+}
+
+function formatFreighterError(error: unknown): string {
+  const raw = (
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message: unknown }).message)
+      : ""
+  ).toLowerCase();
+
+  if (
+    raw.includes("user declined") ||
+    raw.includes("declined") ||
+    raw.includes("reject") ||
+    raw.includes("denied") ||
+    raw.includes("user cancelled") ||
+    raw.includes("cancelled") ||
+    raw.includes("canceled")
+  ) {
+    return "Transaction was rejected in Freighter. Please try again when ready.";
+  }
+
+  if (raw.includes("timeout") || raw.includes("timed out")) {
+    return "Freighter request timed out. Please check your extension and try again.";
+  }
+
+  if (raw.includes("not installed") || raw.includes("not found") || raw.includes("extension")) {
+    return "Freighter wallet not found. Please install the Freighter extension.";
+  }
+
+  return error instanceof Error && error.message ? error.message : "Unable to complete payment.";
 }
 
 export default function XLMCheckoutModal({
@@ -38,6 +82,7 @@ export default function XLMCheckoutModal({
   onSuccess,
   onError,
 }: XLMCheckoutModalProps) {
+  const { addToast } = useToast();
   const [status, setStatus] = useState<"idle" | "signing" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -74,9 +119,10 @@ export default function XLMCheckoutModal({
       setMessage("Payment submitted successfully.");
       onSuccess?.(submitted.hash);
     } catch (error) {
-      const nextMessage = error instanceof Error ? error.message : "Unable to complete payment.";
+      const nextMessage = formatFreighterError(error);
       setStatus("error");
       setMessage(nextMessage);
+      addToast({ type: "error", message: nextMessage });
       onError?.(nextMessage);
     }
   };
@@ -99,7 +145,23 @@ export default function XLMCheckoutModal({
           <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-white/10"><span className="font-semibold text-gray-900 dark:text-white">Total</span><span className="text-xl font-bold text-primary">{totalXLM} XLM</span></div>
         </div>
 
-        {message && <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">{message}{txHash && <p className="mt-2 break-all font-mono text-xs text-green-600 dark:text-green-400">Tx: {txHash}</p>}</div>}
+        {message && (
+          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">
+            {(status === "success" || status === "error") && (
+              <div className="mb-3 flex justify-center">
+                <TransactionStatusAnimation status={status} size={52} />
+              </div>
+            )}
+            <p className={status === "success" ? "text-center font-medium text-emerald-600 dark:text-emerald-400" : status === "error" ? "text-center text-red-600 dark:text-red-400" : ""}>
+              {message}
+            </p>
+            {txHash && (
+              <p className="mt-2 break-all text-center font-mono text-xs text-emerald-600 dark:text-emerald-400">
+                Tx: {txHash}
+              </p>
+            )}
+          </div>
+        )}
 
         <button type="button" onClick={handlePayment} disabled={status === "signing" || status === "success"} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">
           {status === "signing" ? <Loader2 className="h-5 w-5 animate-spin" /> : status === "success" ? <CheckCircle2 className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}

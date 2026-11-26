@@ -209,6 +209,89 @@ describe("currency toggle", () => {
   });
 });
 
+describe("yearly savings", () => {
+  // Ten months charged for twelve, so the saving is two months of the plan.
+  const SAVINGS = [
+    { name: "Personal", usd: "$18", xlm: "100 XLM" },
+    { name: "Business", usd: "$58", xlm: "300 XLM" },
+    { name: "Enterprise", usd: "$198", xlm: "1000 XLM" },
+  ];
+
+  it.each(SAVINGS)("states the $name saving in USD", async (tier) => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    await user.click(screen.getByRole("button", { name: "Yearly" }));
+
+    expect(
+      within(card(tier.name)).getByText(`Save ${tier.usd} — two months free`),
+    ).toBeInTheDocument();
+  });
+
+  it.each(SAVINGS)("states the $name saving in XLM", async (tier) => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    await user.click(screen.getByRole("button", { name: "XLM" }));
+    await user.click(screen.getByRole("button", { name: "Yearly" }));
+
+    expect(
+      within(card(tier.name)).getByText(`Save ${tier.xlm} — two months free`),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no saving while monthly billing is selected", () => {
+    render(<PricingPage />);
+
+    expect(cards().queryByText(/two months free/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("comparison table", () => {
+  /** The Personal column header, which repeats that plan's price. */
+  function personalColumn() {
+    return within(screen.getByRole("table")).getByRole("columnheader", {
+      name: /^Personal/,
+    });
+  }
+
+  it("prices its columns for the selected billing period", async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    expect(personalColumn()).toHaveTextContent("$9/mo");
+
+    await user.click(screen.getByRole("button", { name: "Yearly" }));
+    expect(personalColumn()).toHaveTextContent("$90/yr");
+
+    await user.click(screen.getByRole("button", { name: "Monthly" }));
+    expect(personalColumn()).toHaveTextContent("$9/mo");
+  });
+
+  it("follows the selected currency too", async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    await user.click(screen.getByRole("button", { name: "XLM" }));
+    expect(personalColumn()).toHaveTextContent("50 XLM/mo");
+
+    await user.click(screen.getByRole("button", { name: "Yearly" }));
+    expect(personalColumn()).toHaveTextContent("500 XLM/yr");
+  });
+
+  it("keeps the Free plan free under both billing periods", async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    const freeCard = () => within(card("Free"));
+    expect(freeCard().getByText("$0")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Yearly" }));
+    expect(freeCard().getByText("$0")).toBeInTheDocument();
+    expect(freeCard().getByText("/year")).toBeInTheDocument();
+  });
+});
+
 describe("plan preference", () => {
   it("is disabled, with a prompt to log in, for signed-out visitors", () => {
     render(<PricingPage />);
