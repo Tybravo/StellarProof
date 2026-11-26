@@ -1,28 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { useAuth } from "@/app/context/AuthContext";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import PricingTable from "./components/PricingTable";
-import PricingCards from "./components/PricingCards";
-
-interface PricingTier {
-  name: string;
-  monthlyUSD: number;
-  monthlyXLM: number;
-  /** Yearly price: ten months' worth, i.e. two months free. */
-  yearlyUSD: number;
-  yearlyXLM: number;
-  description: string;
-  features: string[];
-  cta: string;
-  popular?: boolean;
-}
-
-type BillingPeriod = "monthly" | "yearly";
+import PricingTable, {
+  PRICING_TIER_COLUMNS,
+  type PricingTierColumn,
+} from "./components/PricingTable";
+import PricingCards, {
+  formatPrice,
+  priceFor,
+  type BillingPeriod,
+  type Currency,
+  type PricingTier,
+} from "./components/PricingCards";
 
 const pricingTiers: PricingTier[] = [
   {
@@ -93,22 +87,26 @@ const pricingTiers: PricingTier[] = [
 
 export default function PricingPage() {
   const { isAuthenticated } = useAuth();
-  const [currency, setCurrency] = useState<"USD" | "XLM">("USD");
+  const [currency, setCurrency] = useState<Currency>("USD");
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedPreference, setSelectedPreference] = useState<string | null>(null);
 
-  const priceFor = (tier: PricingTier): number => {
-    if (billingPeriod === "yearly") {
-      return currency === "USD" ? tier.yearlyUSD : tier.yearlyXLM;
-    }
-    return currency === "USD" ? tier.monthlyUSD : tier.monthlyXLM;
-  };
+  // The comparison table repeats each plan's price in its column header, so it
+  // has to follow the same billing period and currency as the cards above it.
+  const comparisonTiers = useMemo<PricingTierColumn[]>(
+    () =>
+      PRICING_TIER_COLUMNS.map((column) => {
+        const tier = pricingTiers.find(({ name }) => name === column.name);
+        if (!tier) return column;
 
-  const formatPrice = (amount: number): string =>
-    currency === "USD" ? `$${amount}` : `${amount} XLM`;
+        const amount = priceFor(tier, currency, billingPeriod);
+        const suffix = billingPeriod === "yearly" ? "/yr" : "/mo";
 
-  const periodSuffix = billingPeriod === "yearly" ? "/year" : "/month";
+        return { ...column, price: `${formatPrice(amount, currency)}${suffix}` };
+      }),
+    [billingPeriod, currency]
+  );
 
   const handlePreferenceSave = () => {
     if (isAuthenticated && selectedPreference) {
@@ -244,10 +242,14 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <PricingCards tiers={pricingTiers} currency={currency} />
+        <PricingCards
+          tiers={pricingTiers}
+          currency={currency}
+          billingPeriod={billingPeriod}
+        />
 
         {/* Detailed feature comparison */}
-        <PricingTable />
+        <PricingTable tiers={comparisonTiers} />
 
         {/* FAQ Section */}
         <div className="mt-20 max-w-3xl mx-auto">

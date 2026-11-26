@@ -31,6 +31,12 @@ export interface ManifestData {
 export interface SPVResult {
   encryptedHash: string;
   storageId: string;
+  verified?: boolean;
+  contentHashHex?: string;
+  manifestHashHex?: string;
+  signatureHex?: string;
+  spvId?: string;
+  providerPublicKeyHex?: string;
 }
 
 export interface UploadContentData {

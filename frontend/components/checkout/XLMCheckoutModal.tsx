@@ -5,6 +5,7 @@ import { Networks, Operation, TransactionBuilder, Horizon, BASE_FEE, Asset, Memo
 import { signTransaction, requestAccess } from "@stellar/freighter-api";
 import { CheckCircle2, Loader2, Wallet, XCircle } from "lucide-react";
 import TransactionStatusAnimation from "./TransactionStatusAnimation";
+import { useToast } from "@/context/ToastContext";
 
 interface XLMCheckoutModalProps {
   isOpen: boolean;
@@ -23,11 +24,53 @@ const DEFAULT_MERCHANT_ADDRESS = process.env.NEXT_PUBLIC_CHECKOUT_MERCHANT_ADDRE
 function getSignedXdr(result: unknown): string {
   if (typeof result === "string") return result;
   if (result && typeof result === "object") {
-    const maybe = result as { signedTxXdr?: string; signedTransaction?: string };
+    const maybe = result as {
+      signedTxXdr?: string;
+      signedTransaction?: string;
+      error?: string | { message?: string };
+    };
+    if (maybe.error) {
+      const errMsg = typeof maybe.error === "string" ? maybe.error : maybe.error.message || "Signing rejected";
+      throw new Error(errMsg);
+    }
     if (maybe.signedTxXdr) return maybe.signedTxXdr;
     if (maybe.signedTransaction) return maybe.signedTransaction;
   }
   throw new Error("Freighter did not return a signed transaction.");
+}
+
+function formatFreighterError(error: unknown): string {
+  const raw = (
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message: unknown }).message)
+      : ""
+  ).toLowerCase();
+
+  if (
+    raw.includes("user declined") ||
+    raw.includes("declined") ||
+    raw.includes("reject") ||
+    raw.includes("denied") ||
+    raw.includes("user cancelled") ||
+    raw.includes("cancelled") ||
+    raw.includes("canceled")
+  ) {
+    return "Transaction was rejected in Freighter. Please try again when ready.";
+  }
+
+  if (raw.includes("timeout") || raw.includes("timed out")) {
+    return "Freighter request timed out. Please check your extension and try again.";
+  }
+
+  if (raw.includes("not installed") || raw.includes("not found") || raw.includes("extension")) {
+    return "Freighter wallet not found. Please install the Freighter extension.";
+  }
+
+  return error instanceof Error && error.message ? error.message : "Unable to complete payment.";
 }
 
 export default function XLMCheckoutModal({
@@ -39,6 +82,7 @@ export default function XLMCheckoutModal({
   onSuccess,
   onError,
 }: XLMCheckoutModalProps) {
+  const { addToast } = useToast();
   const [status, setStatus] = useState<"idle" | "signing" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -75,9 +119,10 @@ export default function XLMCheckoutModal({
       setMessage("Payment submitted successfully.");
       onSuccess?.(submitted.hash);
     } catch (error) {
-      const nextMessage = error instanceof Error ? error.message : "Unable to complete payment.";
+      const nextMessage = formatFreighterError(error);
       setStatus("error");
       setMessage(nextMessage);
+      addToast({ type: "error", message: nextMessage });
       onError?.(nextMessage);
     }
   };

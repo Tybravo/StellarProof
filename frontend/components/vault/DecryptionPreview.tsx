@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Eye, Lock, Loader2, Image as ImageIcon, Binary, AlertCircle, X } from "lucide-react";
+import { Eye, Lock, Loader2, Binary, AlertCircle, X } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import Button from "../ui/Button";
+import SecureMediaViewer from "./SecureMediaViewer";
 
 interface VaultItem {
   id: string;
@@ -108,12 +109,17 @@ export function DecryptionPreview({ item }: DecryptionPreviewProps) {
     const text = new TextDecoder().decode(decryptedContent);
 
     // Simple routing based on file extension
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+    if (["jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov", "m4v"].includes(extension || "")) {
+      const mime = ["mp4", "webm", "mov", "m4v"].includes(extension || "")
+        ? `video/${extension}`
+        : `image/${extension === "jpg" ? "jpeg" : extension}`;
+      const blob = new Blob([decryptedContent], { type: mime });
       return (
-        <div className="flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-black/20 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
-          <ImageIcon className="w-12 h-12 text-gray-400 mb-4" />
-          <p className="text-sm text-gray-500">Image preview would render here</p>
-        </div>
+        <SecureMediaViewer
+          blob={blob}
+          filename={item.filename}
+          mimeType={mime}
+        />
       );
     }
 

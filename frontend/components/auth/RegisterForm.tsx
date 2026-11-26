@@ -3,15 +3,11 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/app/context/AuthContext";
-
-interface RegisterFormValues {
-  fullName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
+import { AuthApiError } from "@/services/auth";
+import { registerSchema, type RegisterFormValues } from "@/utils/authSchemas";
 
 function getPasswordStrength(password: string) {
   let score = 0;
@@ -43,6 +39,7 @@ export default function RegisterForm() {
     control,
     formState: { errors },
   } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
     mode: "onBlur",
   });
 
@@ -55,10 +52,13 @@ export default function RegisterForm() {
       await registerAuth(data.fullName, data.email, data.password);
       addToast({ type: "success", message: "Registration successful" });
       router.push("/dashboard");
-    } catch {
+    } catch (err) {
       addToast({
         type: "error",
-        message: "Something went wrong. Please try again.",
+        message:
+          err instanceof AuthApiError
+            ? err.message
+            : "Something went wrong. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -90,13 +90,7 @@ export default function RegisterForm() {
           autoComplete="name"
           placeholder="John Doe"
           className={errors.fullName ? inputError : inputNormal}
-          {...register("fullName", {
-            required: "Full name is required",
-            minLength: {
-              value: 2,
-              message: "Full name must be at least 2 characters",
-            },
-          })}
+          {...register("fullName")}
         />
         {errors.fullName && (
           <p className="text-red-500 text-xs mt-1">
@@ -119,13 +113,7 @@ export default function RegisterForm() {
           autoComplete="email"
           placeholder="you@example.com"
           className={errors.email ? inputError : inputNormal}
-          {...register("email", {
-            required: "Email is required",
-            pattern: {
-              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-              message: "Please enter a valid email address",
-            },
-          })}
+          {...register("email")}
         />
         {errors.email && (
           <p className="text-red-500 text-xs mt-1">
@@ -149,24 +137,7 @@ export default function RegisterForm() {
             autoComplete="new-password"
             placeholder="••••••••"
             className={`${errors.password ? inputError : inputNormal} pr-14`}
-            {...register("password", {
-              required: "Password is required",
-              minLength: {
-                value: 8,
-                message: "Password must be at least 8 characters",
-              },
-              validate: {
-                hasUppercase: (v) =>
-                  /[A-Z]/.test(v) ||
-                  "Password must contain at least one uppercase letter",
-                hasNumber: (v) =>
-                  /[0-9]/.test(v) ||
-                  "Password must contain at least one number",
-                hasSpecial: (v) =>
-                  /[^A-Za-z0-9]/.test(v) ||
-                  "Password must contain at least one special character",
-              },
-            })}
+            {...register("password")}
           />
           <button
             type="button"
@@ -221,11 +192,7 @@ export default function RegisterForm() {
             autoComplete="new-password"
             placeholder="••••••••"
             className={`${errors.confirmPassword ? inputError : inputNormal} pr-14`}
-            {...register("confirmPassword", {
-              required: "Please confirm your password",
-              validate: (v) =>
-                v === passwordValue || "Passwords do not match",
-            })}
+            {...register("confirmPassword")}
           />
           <button
             type="button"

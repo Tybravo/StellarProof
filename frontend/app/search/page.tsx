@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Search,
   X,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../components/Header";
+import NoResultsState from "../../components/search/NoResultsState";
 import {
   fetchAllCertificates,
   searchCertificates,
@@ -19,6 +20,7 @@ import {
 import ListView from "./components/ListView";
 import GridView, { Certificate } from "./components/GridView";
 import type { SearchResult } from "./types";
+import { useDebounce } from "../../hooks/useDebounce";
 import { cn } from "../../utils/cn";
 
 type ViewMode = "list" | "grid";
@@ -56,15 +58,15 @@ function isAbortError(err: unknown): boolean {
  */
 export default function SearchPage() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  /**
-   * Snapshot of the full backend response, restored when the user clears
-   * the search input. Avoids a redundant network round-trip once cached.
-   */
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [allResults, setAllResults] = useState<SearchResult[]>([]);
-  // Start in loading state so the first paint shows the skeleton.
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [indexLoading, setIndexLoading] = useState(true);
+  const [indexError, setIndexError] = useState<string | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const hasQuery = query.trim() !== "";
+  const loading = hasQuery ? searchLoading : indexLoading;
+  const error = hasQuery ? searchError : indexError;
   /** View mode (list vs grid), initialised from localStorage. */
   const [viewMode, setViewMode] = useState<ViewMode>(readViewPreference);
 
@@ -79,16 +81,15 @@ export default function SearchPage() {
       .then((data) => {
         if (cancelled) return;
         setAllResults(data);
-        setResults(data);
       })
       .catch((err: unknown) => {
         if (cancelled || isAbortError(err)) return;
-        setError(
+        setIndexError(
           "Failed to load global certificate index. Please try again.",
         );
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setIndexLoading(false);
       });
 
     return () => {
@@ -108,75 +109,36 @@ export default function SearchPage() {
     }
   }, [viewMode]);
 
-  /* ---------------------------------------------------------------- */
-  /*              Debounced search on query change                   */
-  /* ---------------------------------------------------------------- */
-  // The empty-query case is intentionally NOT handled here — it is
-  // managed by `handleQueryChange` (an event handler) so that we do not
-  // dispatch synchronous setState calls inside an effect body.
-  useEffect(() => {
+  const runSearch = useCallback((signal: AbortSignal) => {
     const trimmed = query.trim();
-    if (trimmed === "") return;
+    if (!trimmed) return;
 
-    let cancelled = false;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      searchCertificates(trimmed, { signal: controller.signal })
-        .then((data) => {
-          if (!cancelled) setResults(data);
-        })
-        .catch((err: unknown) => {
-          if (cancelled || isAbortError(err)) return;
-          setError("Search failed. Please try again.");
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(timer);
-    };
+    searchCertificates(trimmed, { signal })
+      .then((data) => {
+        if (!signal.aborted) setSearchResults(data);
+      })
+      .catch((err: unknown) => {
+        if (signal.aborted || isAbortError(err)) return;
+        setSearchError("Search failed. Please try again.");
+      })
+      .finally(() => {
+        if (!signal.aborted) setSearchLoading(false);
+      });
   }, [query]);
+  useDebounce(runSearch, SEARCH_DEBOUNCE_MS);
 
-  /**
-   * Restore the cached global index and clear transient state. Shared by the
-   * input's onChange (empty string) and the explicit "clear search" button.
-   */
-  function restoreCachedResults() {
-    setError(null);
-    if (allResults.length > 0) {
-      setResults(allResults);
-    }
-    // Always clear loading on the empty path so the skeleton does not
-    // remain stale after a type→clear sequence.
-    setLoading(false);
-  }
-
-  function handleQueryChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const next = event.target.value;
-    setError(null);
+  function updateQuery(next: string) {
+    if (next === query) return;
     setQuery(next);
-
-    const trimmed = next.trim();
-
-    // Clearing the search: restore cached full dataset without a spinner.
-    if (trimmed === "") {
-      restoreCachedResults();
-      return;
-    }
-
-    setLoading(true);
+    setSearchError(null);
+    setSearchLoading(next.trim() !== "");
   }
 
-  /** Clear the input and immediately show the cached global index again. */
   function handleClearSearch() {
-    setQuery("");
-    restoreCachedResults();
+    updateQuery("");
   }
 
+  const results = hasQuery ? searchResults : allResults;
   const verifiedCount = results.filter((r) => r.status === "verified").length;
   const totalCount = results.length;
 
@@ -283,7 +245,7 @@ export default function SearchPage() {
             aria-label="Search certificates globally"
             placeholder="Search by certificate id, asset name, creator or hash…"
             value={query}
-            onChange={handleQueryChange}
+            onChange={(event) => updateQuery(event.target.value)}
             className={cn(
               "w-full rounded-xl border border-gray-300 dark:border-white/10",
               "bg-white dark:bg-white/5 py-2.5 sm:py-3 pl-10 pr-10",
@@ -327,7 +289,12 @@ export default function SearchPage() {
         )}
 
         {/* ─── Results view (list or grid) ──────────────────────────── */}
-        {viewMode === "list" ? (
+        {error ? null : !loading && results.length === 0 ? (
+          <NoResultsState
+            query={query.trim()}
+            onClearFilters={query.trim() ? handleClearSearch : undefined}
+          />
+        ) : viewMode === "list" ? (
           <ListView
             results={results}
             isLoading={loading}
