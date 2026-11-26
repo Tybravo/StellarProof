@@ -15,7 +15,7 @@ export interface DigitalAsset {
   sizeBytes: number;
 }
 
-export const MOCK_ASSETS: DigitalAsset[] = [
+const BASE_MOCK_ASSETS: DigitalAsset[] = [
   {
     id: "asset-1",
     name: "Limited Edition Digital Artwork",
@@ -96,6 +96,32 @@ export const MOCK_ASSETS: DigitalAsset[] = [
   },
 ];
 
+export const MOCK_ASSETS = BASE_MOCK_ASSETS;
+
+/**
+ * Temporary dashboard fixture data. The repeated, uniquely named records let
+ * the real dashboard route exercise several pages until an API contract exists.
+ */
+const DASHBOARD_MOCK_ASSETS: DigitalAsset[] = Array.from({ length: 25 }, (_, index) => {
+  const asset = BASE_MOCK_ASSETS[index % BASE_MOCK_ASSETS.length];
+  return {
+    ...asset,
+    id: `asset-${index + 1}`,
+    name: index === 0 ? asset.name : `${asset.name} ${index + 1}`,
+  };
+});
+
+export interface MockAssetPageRequest {
+  skip: number;
+  limit: number;
+  signal: AbortSignal;
+}
+
+export interface MockAssetPage {
+  items: DigitalAsset[];
+  total: number;
+}
+
 /**
  * Fetches the digital assets belonging to a wallet. Replace with a real
  * indexer/contract call once asset provenance data is served from-chain.
@@ -106,4 +132,39 @@ export async function fetchAssets(
   void __publicKey;
   await new Promise((resolve) => setTimeout(resolve, 500));
   return MOCK_ASSETS;
+}
+
+/**
+ * Temporary paginated adapter for the dashboard fixture source.
+ *
+ * Replace this function with a production service adapter when the backend
+ * publishes its asset endpoint and response contract. It deliberately does
+ * not make a network request or mask production API failures.
+ */
+export async function fetchMockAssetPage(
+  { skip, limit, signal }: MockAssetPageRequest,
+  publicKey?: string,
+): Promise<MockAssetPage> {
+  void publicKey;
+
+  return new Promise<MockAssetPage>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve({
+        items: DASHBOARD_MOCK_ASSETS.slice(skip, skip + limit),
+        total: DASHBOARD_MOCK_ASSETS.length,
+      });
+    }, 500);
+
+    const abort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+  });
 }
