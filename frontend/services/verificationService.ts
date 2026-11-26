@@ -1,5 +1,5 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { signWithFreighter, transactionErrorMessage } from '@/hooks/useSignTransaction';
+import { signTransaction } from '@stellar/freighter-api';
 import { walletService } from './wallet';
 
 export interface SubmissionResult {
@@ -82,6 +82,19 @@ export const submitVerificationRequest = async (
       .setTimeout(30)
       .build();
 
+    // Sign with Freighter
+    let signedResult: unknown;
+    onSigningChange?.(true);
+    try {
+      signedResult = await signTransaction(transaction.toXDR(), {
+        address: publicKey,
+        networkPassphrase,
+      });
+    } finally {
+      onSigningChange?.(false);
+    }
+
+    // Extract the signed XDR string
     let signedXDR: string;
     if (typeof signedResult === 'string') {
       signedXDR = signedResult;

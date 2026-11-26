@@ -55,6 +55,27 @@ describe('submitVerificationRequest failure handling', () => {
     await expect(submitVerificationRequest('h', null, 'G')).resolves.toMatchObject({ txHash: 'abcdef1234' });
   });
 
+  it('signs the built transaction for the connected account and reports signing progress', async () => {
+    mockSubmit.mockResolvedValue({ hash: 'abcdef1234', result_xdr: 'x' });
+    const onSigningChange = jest.fn();
+    await submitVerificationRequest('h', null, 'G', onSigningChange);
+    expect(mockSign).toHaveBeenCalledWith('XDR', {
+      address: 'G',
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+    expect(onSigningChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('ends signing progress and submits nothing when signing throws', async () => {
+    mockSign.mockRejectedValue(new Error('User declined access'));
+    const onSigningChange = jest.fn();
+    await expect(submitVerificationRequest('h', null, 'G', onSigningChange)).rejects.toMatchObject({
+      kind: 'user_rejected',
+    });
+    expect(onSigningChange.mock.calls).toEqual([[true], [false]]);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
   it('classifies Horizon result codes as on-chain failures', async () => {
     mockSubmit.mockRejectedValue(
       Object.assign(new Error('Request failed with status code 400'), {
