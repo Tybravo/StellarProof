@@ -49,6 +49,11 @@ export interface UploadContentData {
   manifestHash: string | null;
   encryptionEnabled: boolean;
   spvResult: SPVResult | null;
+  // IPFS integration
+  mediaCid?: string | null;
+  manifestCid?: string | null;
+  isIpfsUploading?: boolean;
+  ipfsError?: string | null;
 }
 
 export interface WizardFormData {
