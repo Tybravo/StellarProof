@@ -172,7 +172,7 @@ describe('MediaUploadStep', () => {
         fireEvent.change(input, { target: { files: [file] } });
       });
 
-      const img = screen.getByAlt('photo.jpg');
+      const img = screen.getByAltText('photo.jpg');
       expect(img).toBeInTheDocument();
       expect(img).toHaveAttribute('src', mockObjectURL);
     });

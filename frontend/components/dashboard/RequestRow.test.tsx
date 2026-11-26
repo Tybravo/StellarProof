@@ -1,8 +1,20 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import RequestRow from "@/components/dashboard/RequestRow";
-import { mockRequest } from "@/services/mockRequests";
+import RequestRow, { type Request } from "@/components/dashboard/RequestRow";
+
+const mockRequest: Request = {
+  id: "req-1",
+  hash: "0x1234abcd",
+  fullHash: "0x1234abcd5678efgh9012ijkl3456mnop7890qrst",
+  manifest: "bafy-manifest",
+  attestation: "bafy-attestation",
+  timestamp: "2026-01-01T00:00:00.000Z",
+  txHash: "ab".repeat(32),
+  certificateUrl: "https://example.com/certificate.pdf",
+  status: "verified",
+  registryStatus: "verified",
+};
 
 describe("RequestRow", () => {
   it("renders collapsed row and expands on click", async () => {
