@@ -296,8 +296,7 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         isReady={contentHashValid}
       />
 
-      {isSubmitting && !showSignPrompt && <OverlaySpinner />}
-      <SignPromptModal open={showSignPrompt} onClose={() => setShowSignPrompt(false)} />
+      {isSubmitting && <OverlaySpinner />}
     </div>
   );
 }

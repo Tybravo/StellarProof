@@ -1,8 +1,28 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { getAddress, getNetworkDetails, isConnected, signTransaction as signWithFreighter } from '@stellar/freighter-api';
+import { getAddress, getNetworkDetails, isConnected, signTransaction as freighterSignTransaction } from '@stellar/freighter-api';
 import { Networks, Transaction } from '@stellar/stellar-sdk';
+
+export function transactionErrorMessage(cause: unknown) {
+  return errorMessage(cause);
+}
+
+/** Signs an XDR with Freighter and normalises the response to a signed XDR string. */
+export async function signWithFreighter(
+  xdr: string,
+  options: { address: string; networkPassphrase: string }
+): Promise<string> {
+  try {
+    const result = await freighterSignTransaction(xdr, options);
+    if (typeof result === 'string') return result;
+    if (result.error) throw result.error;
+    if (!result.signedTxXdr) throw new Error('Freighter returned no signed transaction.');
+    return result.signedTxXdr;
+  } catch (cause) {
+    throw new Error(transactionErrorMessage(cause));
+  }
+}
 
 function errorMessage(cause: unknown) {
   const error = cause as { code?: number; message?: string };
@@ -46,7 +66,7 @@ export function useSignTransaction(
       const network = await getNetworkDetails();
       if (network.error) throw network.error;
       if (network.networkPassphrase !== networkPassphrase) throw new Error('Select the transaction network in Freighter.');
-      const result = await signWithFreighter(transaction.toXDR(), { address: wallet.address, networkPassphrase });
+      const result = await freighterSignTransaction(transaction.toXDR(), { address: wallet.address, networkPassphrase });
       if (result.error) throw result.error;
       if (!result.signedTxXdr) throw new Error('Freighter returned no signed transaction.');
       return result.signedTxXdr;
@@ -72,7 +92,7 @@ export function useSignTransaction(
       setError(null);
 
       try {
-        const result = await requestSignature(transaction.toXDR(), {
+        const result = await freighterSignTransaction(transaction.toXDR(), {
           address,
           networkPassphrase,
         });

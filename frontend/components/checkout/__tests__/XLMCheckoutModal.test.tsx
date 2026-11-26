@@ -22,7 +22,9 @@ describe("XLMCheckoutModal - Freighter Rejection and Error Handling", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Horizon.Server.prototype, "loadAccount").mockResolvedValue(
-      new Account(VALID_ACCOUNT, "100")
+      new Account(VALID_ACCOUNT, "100") as unknown as Awaited<
+        ReturnType<typeof Horizon.Server.prototype.loadAccount>
+      >
     );
   });
 

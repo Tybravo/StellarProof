@@ -4,12 +4,16 @@ export interface VerifySpvSignatureInput {
   publicKeyHex: string;
 }
 
-function decodeHex(value: string, byteLength: number, label: string): Uint8Array {
+function decodeHex(value: string, byteLength: number, label: string): Uint8Array<ArrayBuffer> {
   const normalized = value.trim().replace(/^0x/i, '');
   if (!new RegExp(`^[0-9a-fA-F]{${byteLength * 2}}$`).test(normalized)) {
     throw new Error(`${label} must contain exactly ${byteLength} bytes of hexadecimal data.`);
   }
-  return Uint8Array.from(normalized.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16));
+  const bytes = new Uint8Array(byteLength);
+  for (let index = 0; index < byteLength; index += 1) {
+    bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
 }
 
 export async function verifySpvSignature(input: VerifySpvSignatureInput): Promise<boolean> {
