@@ -1,8 +1,7 @@
 import "@testing-library/jest-dom";
+import { TextEncoder, TextDecoder } from "util";
 
-// Guarded so suites that opt into the `node` test environment (route handler
-// tests, which need the Web Request/Response globals) can share this setup
-// file without tripping over missing DOM globals.
+// Guarded so suites using `@jest-environment node` (API route tests) can load this file.
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = jest.fn();
 }

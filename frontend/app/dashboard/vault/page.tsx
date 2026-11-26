@@ -8,6 +8,10 @@ import { useWallet } from "@/context/WalletContext";
 
 export default function SealedProvenanceVaultPage() {
   const { publicKey } = useWallet();
+  return <WalletVault key={publicKey ?? "disconnected"} publicKey={publicKey ?? undefined} />;
+}
+
+function WalletVault({ publicKey }: { publicKey?: string }) {
   const [assets, setAssets] = useState<DigitalAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   CheckCircle2,
   Edit2,
@@ -8,22 +8,18 @@ import {
   ShieldCheck,
   Hash,
   FileText,
-  Send,
   Loader2,
-  Upload,
-  AlertCircle,
   RotateCcw,
   ExternalLink,
-  Copy,
   Check,
   HardDrive,
   Lock,
   Globe,
 } from 'lucide-react';
-import { isConnected, requestAccess } from '@stellar/freighter-api';
 import { useWizardStore, SubmissionResult } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
-import { submitVerificationRequest } from '@/services/verificationService';
+import CopyToClipboard from '@/components/ui/CopyToClipboard';
+import ReadyToMint from '../ReadyToMint';
 
 interface ReviewSubmitStepProps {
   onNavigate?: (step: number) => void;
@@ -92,18 +88,6 @@ function OverlaySpinner() {
 }
 
 function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: () => void; }) {
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const handleCopy = useCallback(async (text: string, field: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(field);
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      // Clipboard API not available
-    }
-  }, []);
-
   return (
     <div className="w-full max-w-xl mx-auto space-y-6">
       <div className="flex flex-col items-center text-center space-y-4 py-6">
@@ -135,13 +119,7 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
               <p className="text-xs text-gray-500 dark:text-gray-400">Request ID</p>
               <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.requestId}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleCopy(result.requestId, 'requestId')}
-              className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              {copied === 'requestId' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
-            </button>
+            <CopyToClipboard value={result.requestId} label="request ID" className="ml-2" />
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
@@ -149,13 +127,7 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
               <p className="text-xs text-gray-500 dark:text-gray-400">Transaction Hash</p>
               <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.txHash}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleCopy(result.txHash, 'txHash')}
-              className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              {copied === 'txHash' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
-            </button>
+            <CopyToClipboard value={result.txHash} label="transaction hash" className="ml-2" />
           </div>
 
           {result.certificateId && (
@@ -164,13 +136,7 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
                 <p className="text-xs text-gray-500 dark:text-gray-400">Certificate ID</p>
                 <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.certificateId}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCopy(result.certificateId!, 'certificateId')}
-                className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                {copied === 'certificateId' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
-              </button>
+            <CopyToClipboard value={result.certificateId} label="certificate ID" className="ml-2" />
             </div>
           )}
         </div>
@@ -199,62 +165,15 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
   );
 }
 
-function ErrorState({ error, onRetry, onReset }: { error: string; onRetry: () => void; onReset: () => void; }) {
-  return (
-    <div className="w-full max-w-xl mx-auto space-y-6">
-      <div className="flex flex-col items-center text-center space-y-4 py-6">
-        <div className="w-24 h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-          <AlertCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Submission Failed</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md">{error}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          type="button"
-          onClick={onRetry}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-          Try Again
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          Start Over
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // --- MAIN COMPONENT ---
 
 export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) {
-  const {
-    formData,
-    isSubmitting,
-    submissionResult,
-    submissionError,
-    setIsSubmitting,
-    setSubmissionResult,
-    setSubmissionError,
-    resetWizard,
-  } = useWizardStore();
+  const { formData, isSubmitting, submissionResult, resetWizard } = useWizardStore();
 
-  const [confirmed, setConfirmed] = useState(false);
-  const submissionLockRef = useRef(false);
   const content = formData.content;
   const isEncrypted = content?.encryptionEnabled ?? true;
   const contentHashValid = isValidSHA256(content?.contentHash ?? '');
   const hasManifest = content?.manifest !== null && content?.manifest !== undefined;
-  
-  const canSubmit = contentHashValid && confirmed && !isSubmitting && !submissionResult;
   const file = content?.file;
 
   // Generate thumbnail URL for images with safe Blob check
@@ -275,60 +194,11 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   };
 
-  const handleSubmit = useCallback(async () => {
-    if (!canSubmit || submissionLockRef.current) return;
-
-    submissionLockRef.current = true;
-    setIsSubmitting(true);
-    setSubmissionError(null);
-
-    try {
-      // Wallet Connection Check
-      const walletConnected = await isConnected();
-      if (!walletConnected) {
-        throw new Error('Wallet not connected. Please connect your Freighter wallet to continue.');
-      }
-
-      // Retrieve dynamic active public key using requestAccess (v6 API support)
-      const accessResponse = await requestAccess();
-      if (accessResponse.error) {
-        throw new Error(`Freighter error: ${accessResponse.error}`);
-      }
-
-      const activePublicKey = accessResponse.address;
-      if (!activePublicKey) {
-        throw new Error('Unable to retrieve public key from Freighter wallet.');
-      }
-
-      const result = await submitVerificationRequest(
-        content?.contentHash ?? '',
-        content?.manifestHash ?? null,
-        activePublicKey 
-      );
-
-      setSubmissionResult({
-        ...result,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      setSubmissionError(errorMessage);
-    } finally {
-      submissionLockRef.current = false;
-      setIsSubmitting(false);
-    }
-  }, [canSubmit, content, setIsSubmitting, setSubmissionResult, setSubmissionError]);
-
-  const handleRetry = useCallback(() => {
-    setSubmissionError(null);
-  }, [setSubmissionError]);
-
   const handleReset = useCallback(() => {
     resetWizard();
   }, [resetWizard]);
 
   if (submissionResult) return <SuccessState result={submissionResult} onReset={handleReset} />;
-  if (submissionError) return <ErrorState error={submissionError} onRetry={handleRetry} onReset={handleReset} />;
 
   return (
     <div className="w-full max-w-xl mx-auto space-y-4">
@@ -366,11 +236,14 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 shadow-sm space-y-3">
           <SectionHeader icon={<FileJson className="w-4 h-4" />} title="Manifest Details" stepIndex={1} onNavigate={onNavigate} />
           {hasManifest && content?.manifestHash ? (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-gray-500">Hash</span>
-              <span className="text-xs font-mono text-gray-800 dark:text-gray-200 truncate" title={content.manifestHash}>
-                {content.manifestHash}
-              </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-xs text-gray-500">Hash</span>
+                <span className="text-xs font-mono text-gray-800 dark:text-gray-200 truncate" title={content.manifestHash}>
+                  {content.manifestHash}
+                </span>
+              </div>
+              <CopyToClipboard value={content.manifestHash} label="manifest hash" />
             </div>
           ) : (
             <p className="text-xs text-gray-400 italic">No additional manifest metadata provided.</p>
@@ -404,10 +277,11 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-3">
         <SectionHeader icon={<Hash className="w-4 h-4" />} title="Content Hash Validation" />
         {contentHashValid ? (
-          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+          <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
             <p className="text-xs font-mono break-all text-green-800 dark:text-green-200">
               {content?.contentHash}
             </p>
+            <CopyToClipboard value={content?.contentHash ?? ''} label="content hash" />
           </div>
         ) : (
           <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
@@ -416,46 +290,14 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         )}
       </div>
 
-      {/* Confirmation & Submit */}
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-5 space-y-4 shadow-sm">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-            disabled={isSubmitting}
-            className="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
-          />
-          <span className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-            I confirm that the information above is correct and I authorise the submission to the Stellar network.
-          </span>
-        </label>
+      <ReadyToMint
+        contentHash={content?.contentHash ?? ''}
+        manifestHash={content?.manifestHash ?? null}
+        isReady={contentHashValid}
+      />
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
-            canSubmit
-              ? 'bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              Submit Record
-            </>
-          )}
-        </button>
-      </div>
-
-      {isSubmitting && <OverlaySpinner />}
+      {isSubmitting && !showSignPrompt && <OverlaySpinner />}
+      <SignPromptModal open={showSignPrompt} onClose={() => setShowSignPrompt(false)} />
     </div>
   );
 }

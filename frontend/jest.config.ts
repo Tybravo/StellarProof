@@ -7,6 +7,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/$1'
   },
   roots: ['<rootDir>'],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/cypress/'],
   testMatch: [
     "**/__tests__/**/*.+(ts|tsx|js)",
     "**/*.(test|spec).+(ts|tsx|js)",
