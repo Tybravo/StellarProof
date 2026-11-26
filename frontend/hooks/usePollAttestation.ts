@@ -1,151 +1,142 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { scValToNative, xdr } from '@stellar/stellar-sdk';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { useWizardStore } from '@/features/verification/store/wizard.store';
-import { FailoverRpcServer } from '@/services/rpcWrapper';
+import type { AttestationEvent } from '@/types/spv';
 
+const ATTESTATION_TOPICS = ['Attestation', 'Attested', 'AttestationSubmitted'];
 const DEFAULT_RPC_URL = 'https://soroban-testnet.stellar.org';
-const TOPICS = ['VerificationRequest', 'Attestation', 'Attested'];
 
-export interface ContractEvent {
-  id: string;
-  ledger: number;
-  txHash: string;
-  topic: xdr.ScVal[];
-  value: xdr.ScVal;
-}
-
-export interface ContractEventBatch {
-  events: ContractEvent[];
-  latestLedger: number;
-}
-
-export type AttestationEventSource = (startLedger?: number) => Promise<ContractEventBatch>;
-
-export interface ParsedPollingEvent {
-  kind: 'request' | 'attestation';
-  requestId: string;
-  transactionHash: string;
-  ledger: number;
-}
+type NativeRecord = Record<string, unknown>;
 
 export interface UsePollAttestationOptions {
-  requestId: string;
+  requestId: string | null;
   contractId?: string;
   rpcUrl?: string;
   intervalMs?: number;
   timeoutMs?: number;
   enabled?: boolean;
-  eventSource?: AttestationEventSource;
 }
 
-function record(value: unknown): Record<string, unknown> {
-  if (value instanceof Map) return Object.fromEntries(value.entries()) as Record<string, unknown>;
-  return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+export interface UsePollAttestationResult {
+  attestation: AttestationEvent | null;
+  isPolling: boolean;
+  error: string | null;
+  hasTimedOut: boolean;
+  retry: () => void;
 }
 
-function asString(value: unknown): string | undefined {
-  return typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint'
-    ? String(value)
-    : undefined;
+function asRecord(value: unknown): NativeRecord {
+  if (value instanceof Map) return Object.fromEntries(value.entries()) as NativeRecord;
+  return value !== null && typeof value === 'object' ? (value as NativeRecord) : {};
 }
 
-export function parsePollingEvent(event: ContractEvent): ParsedPollingEvent | null {
-  const names = event.topic.map((topic) => asString(scValToNative(topic)));
-  const isRequest = names.includes('VerificationRequest');
-  const isAttestation = names.includes('Attestation') || names.includes('Attested');
-  if (!isRequest && !isAttestation) return null;
+function valueAsString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  if (value instanceof Uint8Array) {
+    return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return undefined;
+}
 
-  const payload = record(scValToNative(event.value));
-  const requestId = asString(payload.request_id ?? payload.requestId ?? payload.id);
+function pick(payload: NativeRecord, ...fields: string[]): string | undefined {
+  for (const field of fields) {
+    const value = valueAsString(payload[field]);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+export function decodeAttestationEvent(event: rpc.Api.EventResponse): AttestationEvent | null {
+  const topics = event.topic.map((topic) => valueAsString(scValToNative(topic)));
+  if (!topics.some((topic) => topic && ATTESTATION_TOPICS.includes(topic))) return null;
+
+  const raw = asRecord(scValToNative(event.value));
+  const requestId = pick(raw, 'request_id', 'requestId', 'id');
   if (!requestId) return null;
 
   return {
-    kind: isRequest ? 'request' : 'attestation',
+    eventId: event.id,
     requestId,
     transactionHash: event.txHash,
     ledger: event.ledger,
-  };
-}
-
-function rpcEventSource(contractId: string, rpcUrl: string): AttestationEventSource {
-  const server = new FailoverRpcServer(rpcUrl);
-  const topics = TOPICS.map((topic) => [xdr.ScVal.scvSymbol(topic).toXDR('base64')]);
-  return async (startLedger) => {
-    const initialLedger = startLedger ?? (await server.getLatestLedger()).sequence;
-    const result = await server.getEvents({
-      startLedger: initialLedger,
-      filters: [{ type: 'contract', contractIds: [contractId], topics }],
-      limit: 100,
-    });
-    return { events: result.events, latestLedger: result.latestLedger };
+    providerHex: pick(raw, 'provider', 'provider_hex', 'providerHex'),
+    teeHashHex: pick(raw, 'tee_hash', 'teeHash', 'attestation_hash', 'attestationHash'),
+    signatureHex: pick(raw, 'signature', 'signature_hex', 'signatureHex'),
+    raw,
   };
 }
 
 export function usePollAttestation({
   requestId,
-  contractId = process.env.NEXT_PUBLIC_VITE_SOROBAN_CONTRACT_ID ?? '',
+  contractId = process.env.NEXT_PUBLIC_VITE_SOROBAN_CONTRACT_ID,
   rpcUrl = process.env.NEXT_PUBLIC_VITE_SOROBAN_RPC_URL ?? DEFAULT_RPC_URL,
   intervalMs = 4_000,
   timeoutMs = 120_000,
   enabled = true,
-  eventSource,
-}: UsePollAttestationOptions) {
-  const setProgress = useWizardStore((state) => state.setVerificationProgress);
-  const [attestation, setAttestation] = useState<ParsedPollingEvent | null>(null);
+}: UsePollAttestationOptions): UsePollAttestationResult {
+  const setVerificationStage = useWizardStore((state) => state.setVerificationStage);
+  const [attestation, setAttestation] = useState<AttestationEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasTimedOut, setHasTimedOut] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const startLedgerRef = useRef<number | null>(null);
 
   const retry = useCallback(() => {
+    startLedgerRef.current = null;
     setAttestation(null);
     setError(null);
     setHasTimedOut(false);
-    setRetryKey((key) => key + 1);
+    setAttempt((value) => value + 1);
   }, []);
 
   useEffect(() => {
-    if (!enabled || !requestId || (!contractId && !eventSource) || attestation) return;
-    const source = eventSource ?? rpcEventSource(contractId, rpcUrl);
-    const startedAt = Date.now();
-    let latestLedger: number | undefined;
+    if (!enabled || !requestId || !contractId || attestation) return;
+
+    const server = new rpc.Server(rpcUrl);
     let cancelled = false;
+    const startedAt = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const poll = async () => {
       if (cancelled) return;
       if (Date.now() - startedAt >= timeoutMs) {
         setHasTimedOut(true);
-        setError('Oracle attestation polling timed out.');
+        setError('The Oracle did not submit an attestation before the polling deadline.');
         return;
       }
+
       try {
-        const batch = await source(latestLedger);
-        latestLedger = batch.latestLedger;
-        for (const event of batch.events) {
-          const parsed = parsePollingEvent(event);
-          if (!parsed || parsed.requestId !== requestId) continue;
-          if (parsed.kind === 'request') {
-            setProgress({
-              stage: 'Processing',
-              requestId: parsed.requestId,
-              transactionHash: parsed.transactionHash,
-            });
-          } else {
-            setProgress({
-              stage: 'Attested',
-              requestId: parsed.requestId,
-              transactionHash: parsed.transactionHash,
-            });
-            setAttestation(parsed);
-            setError(null);
-            return;
-          }
+        if (startLedgerRef.current === null) {
+          startLedgerRef.current = (await server.getLatestLedger()).sequence;
+        }
+        const topics = ATTESTATION_TOPICS.map((topic) => [
+          xdr.ScVal.scvSymbol(topic).toXDR('base64'),
+        ]);
+        const response = await server.getEvents({
+          startLedger: startLedgerRef.current,
+          filters: [{ type: 'contract', contractIds: [contractId], topics }],
+          limit: 100,
+        });
+        startLedgerRef.current = response.latestLedger;
+
+        const matched = response.events
+          .map(decodeAttestationEvent)
+          .find((event) => event?.requestId === requestId);
+        if (matched && !cancelled) {
+          setAttestation(matched);
+          setVerificationStage('Attested');
+          setError(null);
+          return;
         }
       } catch (pollError) {
-        setError(pollError instanceof Error ? pollError.message : 'Unable to poll contract events.');
+        if (!cancelled) {
+          setError(pollError instanceof Error ? pollError.message : 'Unable to poll Soroban events.');
+        }
       }
+
       timer = setTimeout(poll, intervalMs);
     };
 
@@ -154,14 +145,13 @@ export function usePollAttestation({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [attestation, contractId, enabled, eventSource, intervalMs, requestId, retryKey, rpcUrl, setProgress, timeoutMs]);
+  }, [attestation, attempt, contractId, enabled, intervalMs, requestId, rpcUrl, setVerificationStage, timeoutMs]);
 
   return {
     attestation,
+    isPolling: enabled && Boolean(requestId && contractId) && !attestation && !hasTimedOut,
     error,
     hasTimedOut,
-    isPolling: enabled && !attestation && !hasTimedOut,
-    connectionState: error ? 'reconnecting' : 'connected',
     retry,
-  } as const;
+  };
 }
