@@ -11,6 +11,9 @@ jest.mock('@stellar/freighter-api', () => ({
   requestAccess: jest.fn().mockResolvedValue({ address: 'GDUMMYPUBLICKEY' }),
 }));
 
+// Keep covering the mint UI flow while the real switch is off.
+jest.mock('@/config/minting', () => ({ WALLET_MINTING_ENABLED: true, MINTING_UNAVAILABLE_MESSAGE: '' }));
+
 jest.mock('@/services/verificationService', () => {
   class VerificationSubmissionError extends Error {
     kind: string;

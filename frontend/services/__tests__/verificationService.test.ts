@@ -2,6 +2,8 @@ const mockSign = jest.fn();
 const mockSubmit = jest.fn();
 
 jest.mock('@stellar/freighter-api', () => ({ signTransaction: (...a: unknown[]) => mockSign(...a) }));
+// Keep covering the submission pipeline while the real switch is off.
+jest.mock('@/config/minting', () => ({ WALLET_MINTING_ENABLED: true, MINTING_UNAVAILABLE_MESSAGE: '' }));
 jest.mock('../wallet', () => ({
   walletService: { getNetworkDetails: jest.fn().mockResolvedValue(null) },
 }));
