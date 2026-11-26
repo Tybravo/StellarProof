@@ -2,70 +2,56 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/app/context/AuthContext";
+import { AuthApiError } from "@/services/auth";
+import { loginSchema, type LoginFormValues } from "@/utils/authSchemas";
 
 export default function LoginForm() {
   const router = useRouter();
   const { addToast } = useToast();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
 
-  const validateEmail = () => {
-    if (!email) {
-      setEmailError("Email is required");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEmailError("Please enter a valid email address");
-    } else {
-      setEmailError("");
-    }
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+  });
 
-  const validatePassword = () => {
-    if (!password) {
-      setPasswordError("Password is required");
-    } else {
-      setPasswordError("");
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    validateEmail();
-    validatePassword();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) return;
+  const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      await login(email, password);
+      await login(data.email, data.password);
       addToast({ type: "success", message: "Welcome back!" });
       router.push("/dashboard");
-    } catch {
-      addToast({
-        type: "error",
-        message: "Authentication failed. Please check your credentials.",
-      });
+    } catch (err) {
+      const message =
+        err instanceof AuthApiError && err.status === 401
+          ? "Authentication failed. Please check your credentials."
+          : err instanceof AuthApiError
+            ? err.message
+            : "Something went wrong. Please try again.";
+      addToast({ type: "error", message });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const emailInputClass = emailError
-    ? "w-full px-4 py-2.5 rounded-lg border border-red-500 text-sm bg-white dark:bg-darkblue-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
-    : "w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm bg-white dark:bg-darkblue-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary transition";
-
-  const passwordInputClass = passwordError
-    ? "w-full px-4 py-2.5 rounded-lg border border-red-500 text-sm bg-white dark:bg-darkblue-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition pr-10"
-    : "w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm bg-white dark:bg-darkblue-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary transition pr-10";
+  const inputBase =
+    "w-full px-4 py-2.5 rounded-lg border text-sm bg-white dark:bg-darkblue-dark text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition";
+  const inputNormal = `${inputBase} border-gray-300 dark:border-gray-600 focus:ring-primary`;
+  const inputError = `${inputBase} border-red-500 focus:ring-red-500`;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-5 w-full">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5 w-full">
       <div>
         <label
           htmlFor="email"
@@ -77,16 +63,16 @@ export default function LoginForm() {
           id="email"
           type="email"
           autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={validateEmail}
           placeholder="you@example.com"
-          aria-invalid={!!emailError}
-          aria-describedby={emailError ? "email-error" : undefined}
-          className={emailInputClass}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          className={errors.email ? inputError : inputNormal}
+          {...register("email")}
         />
-        {emailError && (
-          <p id="email-error" role="alert" className="text-red-500 text-xs mt-1">{emailError}</p>
+        {errors.email && (
+          <p id="email-error" role="alert" className="text-red-500 text-xs mt-1">
+            {errors.email.message}
+          </p>
         )}
       </div>
       <div>
@@ -101,13 +87,11 @@ export default function LoginForm() {
             id="password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={validatePassword}
             placeholder="••••••••"
-            aria-invalid={!!passwordError}
-            aria-describedby={passwordError ? "password-error" : undefined}
-            className={passwordInputClass}
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            className={`${errors.password ? inputError : inputNormal} pr-10`}
+            {...register("password")}
           />
           <button
             type="button"
@@ -119,24 +103,14 @@ export default function LoginForm() {
             <span aria-hidden="true">{showPassword ? "Hide" : "Show"}</span>
           </button>
         </div>
-        {passwordError && (
-          <p id="password-error" role="alert" className="text-red-500 text-xs mt-1">{passwordError}</p>
+        {errors.password && (
+          <p id="password-error" role="alert" className="text-red-500 text-xs mt-1">
+            {errors.password.message}
+          </p>
         )}
       </div>
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            className="accent-primary"
-          />
-          Remember me
-        </label>
-        <a
-          href="/forget-password"
-          className="text-sm text-primary hover:underline"
-        >
+      <div className="flex items-center justify-end">
+        <a href="/forget-password" className="text-sm text-primary hover:underline">
           Forgot your password?
         </a>
       </div>
@@ -164,11 +138,7 @@ export default function LoginForm() {
                 stroke="currentColor"
                 strokeWidth="4"
               />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v8z"
-              />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
             <span aria-hidden="true">Signing in...</span>
           </>
