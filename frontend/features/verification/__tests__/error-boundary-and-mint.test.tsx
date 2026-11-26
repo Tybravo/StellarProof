@@ -115,7 +115,7 @@ describe('ReadyToMint', () => {
     render(<ReadyToMint contentHash={HASH} manifestHash="mh" isReady />);
     await confirmAndSubmit(user);
     await waitFor(() => expect(useWizardStore.getState().submissionResult?.txHash).toBe('tx1'));
-    expect(mockedSubmit).toHaveBeenCalledWith(HASH, 'mh', 'GDUMMYPUBLICKEY');
+    expect(mockedSubmit).toHaveBeenCalledWith(HASH, 'mh', 'GDUMMYPUBLICKEY', undefined);
   });
 
   it('shows a categorised error UI when the transaction fails on-chain, and can retry', async () => {

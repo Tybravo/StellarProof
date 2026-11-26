@@ -15,6 +15,8 @@ export interface ReadyToMintProps {
   manifestHash: string | null;
   /** Whether the content hash is valid and minting may be attempted. */
   isReady: boolean;
+  /** Called when Freighter signing starts or ends. */
+  onSigningChange?: (signing: boolean) => void;
 }
 
 interface MintFailure {
@@ -92,7 +94,12 @@ export function MintFailureNotice({
  * Final confirmation + mint action. Owns the wallet/sign/submit sequence and
  * shows a recoverable error UI if any part of the mint transaction fails.
  */
-export default function ReadyToMint({ contentHash, manifestHash, isReady }: ReadyToMintProps) {
+export default function ReadyToMint({
+  contentHash,
+  manifestHash,
+  isReady,
+  onSigningChange,
+}: ReadyToMintProps) {
   const {
     isSubmitting,
     submissionResult,
@@ -135,16 +142,22 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
         throw new VerificationSubmissionError('Unable to retrieve public key from Freighter wallet.', 'unknown');
       }
 
-      const result = await submitVerificationRequest(contentHash, manifestHash, activePublicKey);
+      const result = await submitVerificationRequest(
+        contentHash,
+        manifestHash,
+        activePublicKey,
+        onSigningChange
+      );
       setSubmissionResult({ ...result, timestamp: new Date().toISOString() });
     } catch (error) {
       setFailureKind(error instanceof VerificationSubmissionError ? error.kind : 'unknown');
       setSubmissionError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
+      onSigningChange?.(false);
       lockRef.current = false;
       setIsSubmitting(false);
     }
-  }, [canSubmit, contentHash, manifestHash, setIsSubmitting, setSubmissionResult, setSubmissionError]);
+  }, [canSubmit, contentHash, manifestHash, onSigningChange, setIsSubmitting, setSubmissionResult, setSubmissionError]);
 
   if (submissionError) {
     return (
