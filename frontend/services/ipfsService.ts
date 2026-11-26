@@ -123,3 +123,5 @@ export const uploadManifestToIPFS = async (
     };
   }
 };
+
+export { uploadMediaWithFallback, uploadToCloudinary } from './cloudinaryFallback';

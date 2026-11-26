@@ -9,3 +9,4 @@ if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
 if (typeof window !== "undefined" && !window.scrollTo) {
   window.scrollTo = jest.fn();
 }
+
