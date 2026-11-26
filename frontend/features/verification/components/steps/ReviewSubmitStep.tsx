@@ -23,6 +23,8 @@ import {
 import { isConnected, requestAccess } from '@stellar/freighter-api';
 import { useWizardStore, SubmissionResult } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
+import { SignPromptModal } from '@/components/wallet/SignPromptModal';
+import { transactionErrorMessage } from '@/hooks/useSignTransaction';
 import { submitVerificationRequest } from '@/services/verificationService';
 
 interface ReviewSubmitStepProps {
@@ -247,6 +249,7 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
     resetWizard,
   } = useWizardStore();
 
+  const [showSignPrompt, setShowSignPrompt] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const submissionLockRef = useRef(false);
   const content = formData.content;
@@ -285,14 +288,14 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
     try {
       // Wallet Connection Check
       const walletConnected = await isConnected();
-      if (!walletConnected) {
+      if (!walletConnected.isConnected) {
         throw new Error('Wallet not connected. Please connect your Freighter wallet to continue.');
       }
 
       // Retrieve dynamic active public key using requestAccess (v6 API support)
       const accessResponse = await requestAccess();
       if (accessResponse.error) {
-        throw new Error(`Freighter error: ${accessResponse.error}`);
+        throw accessResponse.error;
       }
 
       const activePublicKey = accessResponse.address;
@@ -303,7 +306,8 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
       const result = await submitVerificationRequest(
         content?.contentHash ?? '',
         content?.manifestHash ?? null,
-        activePublicKey 
+        activePublicKey,
+        setShowSignPrompt
       );
 
       setSubmissionResult({
@@ -311,9 +315,10 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const errorMessage = transactionErrorMessage(error);
       setSubmissionError(errorMessage);
     } finally {
+      setShowSignPrompt(false);
       submissionLockRef.current = false;
       setIsSubmitting(false);
     }
@@ -455,7 +460,8 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         </button>
       </div>
 
-      {isSubmitting && <OverlaySpinner />}
+      {isSubmitting && !showSignPrompt && <OverlaySpinner />}
+      <SignPromptModal open={showSignPrompt} onClose={() => setShowSignPrompt(false)} />
     </div>
   );
 }
