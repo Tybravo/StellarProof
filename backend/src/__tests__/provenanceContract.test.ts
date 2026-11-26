@@ -1,8 +1,20 @@
 import crypto from "crypto";
-import { Address, Keypair, StrKey, scValToNative, xdr } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Address,
+  BASE_FEE,
+  Keypair,
+  Networks,
+  SorobanDataBuilder,
+  StrKey,
+  rpc,
+  scValToNative,
+  xdr,
+} from "@stellar/stellar-sdk";
 import { ProvenanceContract } from "../services/contracts/ProvenanceContract";
 import { AppError } from "../errors/AppError";
 import type { ContractCall } from "../utils/transactionBuilder";
+import { buildMintArgs } from "../utils/xdr";
 
 const contractId = (): string => StrKey.encodeContract(crypto.randomBytes(32));
 const OWNER = Keypair.random().publicKey();
@@ -122,5 +134,116 @@ describe("ProvenanceContract.getCertificate", () => {
     await expect(contract.getCertificate("1")).rejects.toMatchObject({
       code: "SOROBAN_RPC_TIMEOUT",
     });
+  });
+});
+
+describe("ProvenanceContract.prepareMint", () => {
+  const RESOURCE_FEE = 12_345;
+  const mintArgs = {
+    to: OWNER,
+    mediaCid: CID,
+    manifestHash: MANIFEST_HASH,
+    attestationHash: ATTESTATION_HASH,
+  };
+
+  function simulationSuccess(): rpc.Api.SimulateTransactionSuccessResponse {
+    return {
+      _parsed: true,
+      id: "1",
+      latestLedger: 1,
+      events: [],
+      transactionData: new SorobanDataBuilder(),
+      minResourceFee: String(RESOURCE_FEE),
+      result: { auth: [], retval: xdr.ScVal.scvU64(new xdr.Uint64(BigInt(1))) },
+    };
+  }
+
+  /** Only the RPC client is faked; building, preparing and signing are real. */
+  function harness() {
+    const signer = Keypair.random();
+    const target = contractId();
+    const soroban = {
+      networkPassphrase: Networks.TESTNET,
+      loadAccount: jest.fn(async () => new Account(signer.publicKey(), "100")),
+      simulate: jest.fn(async (): Promise<unknown> => simulationSuccess()),
+      sendTransaction: jest.fn(async () => undefined),
+      getTransaction: jest.fn(),
+    };
+    const contract = new ProvenanceContract(target, signer, soroban as never);
+    return { signer, target, soroban, contract };
+  }
+
+  it("builds a mint invocation with the CertificateDetails arguments", async () => {
+    const h = harness();
+    const { transaction } = await h.contract.prepareMint(mintArgs);
+
+    expect(h.soroban.loadAccount).toHaveBeenCalledWith(h.signer.publicKey());
+    expect(transaction.source).toBe(h.signer.publicKey());
+    expect(transaction.networkPassphrase).toBe(Networks.TESTNET);
+    expect(transaction.operations).toHaveLength(1);
+    const operation = transaction.operations[0];
+    if (operation.type !== "invokeHostFunction") throw new Error("unexpected operation");
+    const call = operation.func.invokeContract();
+    expect(Address.fromScAddress(call.contractAddress()).toString()).toBe(h.target);
+    expect(call.functionName().toString()).toBe("mint");
+    expect(call.args().map((arg) => arg.toXDR("base64"))).toEqual(
+      buildMintArgs(mintArgs).map((arg) => arg.toXDR("base64"))
+    );
+  });
+
+  it("applies the simulation result and signs with the oracle key", async () => {
+    const h = harness();
+    const { transaction, transactionHash } = await h.contract.prepareMint(mintArgs);
+
+    expect(h.soroban.simulate).toHaveBeenCalledTimes(1);
+    expect(transaction.toEnvelope().v1().tx().ext().switch()).toBe(1);
+    expect(transaction.fee).toBe(String(Number(BASE_FEE) + RESOURCE_FEE));
+    expect(transaction.signatures).toHaveLength(1);
+    expect(h.signer.verify(transaction.hash(), transaction.signatures[0].signature())).toBe(true);
+    expect(transactionHash).toBe(transaction.hash().toString("hex"));
+    expect(transactionHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("submits exactly the transaction it prepared", async () => {
+    const h = harness();
+    const prepared = await h.contract.prepareMint(mintArgs);
+
+    expect(h.soroban.sendTransaction).not.toHaveBeenCalled();
+    await h.contract.submit(prepared);
+    expect(h.soroban.sendTransaction).toHaveBeenCalledWith(prepared.transaction);
+  });
+
+  it("propagates a rejected simulation", async () => {
+    const h = harness();
+    h.soroban.simulate.mockRejectedValue(
+      new AppError("Soroban simulation failed", 422, "SOROBAN_SIMULATION_FAILED")
+    );
+
+    await expect(h.contract.prepareMint(mintArgs)).rejects.toMatchObject({
+      code: "SOROBAN_SIMULATION_FAILED",
+    });
+    expect(h.soroban.sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses when archived ledger entries must be restored first", async () => {
+    const h = harness();
+    h.soroban.simulate.mockResolvedValue({
+      ...simulationSuccess(),
+      restorePreamble: {
+        minResourceFee: "1",
+        transactionData: new SorobanDataBuilder(),
+      },
+    });
+
+    await expect(h.contract.prepareMint(mintArgs)).rejects.toThrow(/restoring archived ledger entries/);
+  });
+
+  it("rejects invalid mint input before simulating", async () => {
+    const h = harness();
+
+    await expect(
+      h.contract.prepareMint({ ...mintArgs, manifestHash: "not-a-hash" })
+    ).rejects.toThrow(/manifestHash/);
+    expect(h.soroban.simulate).not.toHaveBeenCalled();
   });
 });

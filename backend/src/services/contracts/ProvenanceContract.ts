@@ -243,11 +243,22 @@ export class ProvenanceContract {
   async prepareMint(input: MintArgs): Promise<PreparedMint> {
     const soroban = this.requireMutationClient();
     const signer = this.signer as Keypair;
-    // Mock implementation
-    return {
-      transactionHash: 'mock-hash',
-      transaction: {} as any
-    };
+    const { buildSignedContractTransaction } =
+      require("../../utils/transactionBuilder") as typeof import("../../utils/transactionBuilder");
+    const signed = await buildSignedContractTransaction({
+      client: {
+        getAccount: (address) => soroban.loadAccount(address),
+        simulateTransaction: (transaction) => soroban.simulate(transaction),
+      },
+      keypair: signer,
+      networkPassphrase: soroban.networkPassphrase,
+      call: {
+        contractId: this.contractId,
+        method: "mint",
+        args: buildMintArgs(input),
+      },
+    });
+    return { transactionHash: signed.hash, transaction: signed.transaction };
   }
 
   async submit(prepared: PreparedMint): Promise<void> {
