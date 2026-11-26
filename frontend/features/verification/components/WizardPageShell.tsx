@@ -8,6 +8,7 @@ import UploadMedia from './steps/UploadMedia';
 import UploadManifest from './steps/UploadManifest';
 import UploadSPVOptions from './steps/UploadSPVOptions';
 import ReviewSubmitStep from './steps/ReviewSubmitStep';
+import VerificationErrorBoundary from './VerificationErrorBoundary';
 
 const STEPS = [
   { id: 0, label: 'Media Upload' },
@@ -95,7 +96,9 @@ export default function WizardPageShell() {
           </h2>
 
           <div className="min-h-[200px]" aria-labelledby="wizard-step-heading">
-            {stepComponents[currentStep]}
+            <VerificationErrorBoundary resetKeys={[currentStep]} onReset={resetWizard}>
+              {stepComponents[currentStep]}
+            </VerificationErrorBoundary>
           </div>
 
           {!isLastStep ? (

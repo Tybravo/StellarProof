@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom";
+import { TextEncoder, TextDecoder } from "util";
 
-if (!Element.prototype.scrollIntoView) {
+// Guarded so suites using `@jest-environment node` (API route tests) can load this file.
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = jest.fn();
 }
 
-if (!window.scrollTo) {
+if (typeof window !== "undefined" && !window.scrollTo) {
   window.scrollTo = jest.fn();
 }
