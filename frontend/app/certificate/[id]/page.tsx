@@ -10,6 +10,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `Certificate ${id} — StellarProof`,
     description: "View and verify a StellarProof provenance certificate secured by Soroban smart contracts.",
+    // Certificates are public and intended to be shared and indexed.
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: `StellarProof Certificate ${id}`,
+      description: "Publicly verifiable provenance certificate on Stellar.",
+      type: "website",
+    },
   };
 }
 

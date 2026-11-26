@@ -22,8 +22,11 @@ export interface WalletService {
 async function isFreighterInstalled(): Promise<boolean> {
   try {
     if (typeof window === "undefined") return false;
-    await import("@stellar/freighter-api");
-    return true;
+    const { isConnected } = await import("@stellar/freighter-api");
+    // isConnected() reports whether the Freighter extension is present in the
+    // browser; it resolves to false (or errors) when it is not installed.
+    const res = await isConnected();
+    return Boolean(res && res.isConnected && !res.error);
   } catch {
     return false;
   }
