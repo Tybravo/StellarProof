@@ -98,15 +98,15 @@ describe('ReadyToMint', () => {
 
   async function confirmAndSubmit(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('button', { name: /submit record/i }));
+    await user.click(screen.getByRole('button', { name: /mint certificate/i }));
   }
 
   it('keeps the submit button disabled until confirmed', async () => {
     const user = userEvent.setup();
     render(<ReadyToMint contentHash={HASH} manifestHash={null} isReady />);
-    expect(screen.getByRole('button', { name: /submit record/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /mint certificate/i })).toBeDisabled();
     await user.click(screen.getByRole('checkbox'));
-    expect(screen.getByRole('button', { name: /submit record/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /mint certificate/i })).toBeEnabled();
   });
 
   it('stores the result on success', async () => {
@@ -134,7 +134,7 @@ describe('ReadyToMint', () => {
     expect(useWizardStore.getState().isSubmitting).toBe(false);
 
     await user.click(screen.getByRole('button', { name: /try again/i }));
-    expect(screen.getByRole('button', { name: /submit record/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mint certificate/i })).toBeInTheDocument();
     expect(useWizardStore.getState().submissionError).toBeNull();
   });
 

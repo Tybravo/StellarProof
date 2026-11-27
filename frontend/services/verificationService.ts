@@ -1,5 +1,5 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { signWithFreighter, transactionErrorMessage } from '@/hooks/useSignTransaction';
+import { signTransaction } from '@stellar/freighter-api';
 import { walletService } from './wallet';
 
 export interface SubmissionResult {
@@ -15,20 +15,18 @@ export type SubmissionFailureKind =
   | 'configuration'
   | 'unknown';
 
-/** Error thrown by submitVerificationRequest with a machine readable failure category. */
+/** Error thrown by submitVerificationRequest with a machine-readable category. */
 export class VerificationSubmissionError extends Error {
-  kind: SubmissionFailureKind;
-  resultCodes?: { transaction?: string; operations?: string[] };
-
   constructor(
     message: string,
-    kind: SubmissionFailureKind = 'unknown',
-    resultCodes?: { transaction?: string; operations?: string[] }
+    public readonly kind: SubmissionFailureKind = 'unknown',
+    public readonly resultCodes?: {
+      transaction?: string;
+      operations?: string[];
+    },
   ) {
     super(message);
     this.name = 'VerificationSubmissionError';
-    this.kind = kind;
-    this.resultCodes = resultCodes;
   }
 }
 
@@ -43,8 +41,7 @@ const server = new StellarSDK.Horizon.Server(HORIZON_URL);
 export const submitVerificationRequest = async (
   contentHash: string,
   manifestHash: string | null,
-  publicKey: string,
-  onSigningChange?: (signing: boolean) => void
+  publicKey: string
 ): Promise<SubmissionResult> => {
   try {
     if (!CONTRACT_ID) {
@@ -82,6 +79,13 @@ export const submitVerificationRequest = async (
       .setTimeout(30)
       .build();
 
+    // Sign with Freighter
+    const signedResult = await signTransaction(transaction.toXDR(), {
+      address: publicKey,
+      networkPassphrase: networkPassphrase,
+    });
+
+    // Extract the signed XDR string correctly
     let signedXDR: string;
     if (typeof signedResult === 'string') {
       signedXDR = signedResult;
@@ -94,7 +98,7 @@ export const submitVerificationRequest = async (
       };
       if (resultObj.error) {
         const detail = typeof resultObj.error === 'string' ? resultObj.error : resultObj.error.message;
-        throw new Error(detail || 'Freighter failed to sign the transaction');
+        throw new VerificationSubmissionError(detail || 'Freighter failed to sign the transaction', 'user_rejected');
       }
       signedXDR = resultObj.signedTxXdr || resultObj.signedTransaction || '';
       if (!signedXDR) {
@@ -142,7 +146,14 @@ export const submitVerificationRequest = async (
 interface HorizonErrorLike {
   response?: {
     status?: number;
-    data?: { extras?: { result_codes?: { transaction?: string; operations?: string[] } } };
+    data?: {
+      extras?: {
+        result_codes?: {
+          transaction?: string;
+          operations?: string[];
+        };
+      };
+    };
   };
 }
 
@@ -151,7 +162,7 @@ function toSubmissionError(error: unknown): VerificationSubmissionError {
 
   if (!(error instanceof Error)) {
     return new VerificationSubmissionError(
-      'An unexpected error occurred while submitting the verification request'
+      'An unexpected error occurred while submitting the verification request',
     );
   }
 
@@ -164,19 +175,23 @@ function toSubmissionError(error: unknown): VerificationSubmissionError {
 
   if (resultCodes) {
     const code = resultCodes.transaction;
-    const ops = resultCodes.operations?.filter((op) => op !== 'op_success') ?? [];
+    const operations = resultCodes.operations?.filter((operation) => operation !== 'op_success') ?? [];
     let friendly = 'The transaction was rejected by the Stellar network.';
+
     if (code === 'tx_bad_seq') friendly = 'Transaction sequence error. Please try again.';
-    else if (code === 'tx_insufficient_balance' || ops.includes('op_underfunded'))
+    else if (code === 'tx_insufficient_balance' || operations.includes('op_underfunded')) {
       friendly = 'Insufficient balance to submit the verification request.';
-    else if (code === 'tx_insufficient_fee')
+    } else if (code === 'tx_insufficient_fee') {
       friendly = 'The network fee was too low. Please try again.';
-    else if (code === 'tx_too_late') friendly = 'The transaction expired before it was included in a ledger. Please try again.';
-    const detail = [code, ...ops].filter(Boolean).join(', ');
+    } else if (code === 'tx_too_late') {
+      friendly = 'The transaction expired before it was included in a ledger. Please try again.';
+    }
+
+    const detail = [code, ...operations].filter(Boolean).join(', ');
     return new VerificationSubmissionError(
       detail ? `${friendly} (${detail})` : friendly,
       'on_chain',
-      resultCodes
+      resultCodes,
     );
   }
 
@@ -191,7 +206,7 @@ function toSubmissionError(error: unknown): VerificationSubmissionError {
   if (message.includes('insufficient balance')) {
     return new VerificationSubmissionError(
       'Insufficient balance to submit the verification request.',
-      'on_chain'
+      'on_chain',
     );
   }
 
@@ -199,13 +214,10 @@ function toSubmissionError(error: unknown): VerificationSubmissionError {
     /network error|failed to fetch|timeout|timed out|ECONN|ENOTFOUND/i.test(message) ||
     (error as HorizonErrorLike).response?.status === 503
   ) {
-    return new VerificationSubmissionError(
-      `Could not reach the Stellar network: ${message}`,
-      'network'
-    );
+    return new VerificationSubmissionError(`Could not reach the Stellar network: ${message}`, 'network');
   }
 
-  return new VerificationSubmissionError(`Transaction failed: ${message}`, 'unknown');
+  return new VerificationSubmissionError(`Transaction failed: ${message}`);
 }
 
 export type VerificationStatus = 'pending' | 'verified' | 'failed' | 'processing';

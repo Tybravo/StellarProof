@@ -13,7 +13,7 @@ import {
 export interface ReadyToMintProps {
   contentHash: string;
   manifestHash: string | null;
-  /** Whether the content hash is valid and minting may be attempted. */
+  /** Whether the verified content hash is valid and can be submitted. */
   isReady: boolean;
 }
 
@@ -33,7 +33,7 @@ const FAILURE_COPY: Record<SubmissionFailureKind, { title: string; hint: string 
   },
   on_chain: {
     title: 'Transaction failed on-chain',
-    hint: 'The network rejected the mint transaction, so your content was not recorded. Review the details below and try again.',
+    hint: 'The network rejected the mint transaction, so your content was not recorded. Try again when ready.',
   },
   configuration: {
     title: 'Minting is not configured',
@@ -55,23 +55,31 @@ export function MintFailureNotice({
   onReset: () => void;
 }) {
   const copy = FAILURE_COPY[failure.kind];
+
   return (
     <div role="alert" className="space-y-4">
       <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
-        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <AlertCircle
+          className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
+          aria-hidden="true"
+        />
         <div className="min-w-0 space-y-1">
           <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">{copy.title}</h3>
           <p className="text-xs text-red-700 dark:text-red-300">{copy.hint}</p>
-          <p className="break-words font-mono text-xs text-red-700 dark:text-red-300" data-testid="mint-error-message">
+          <p
+            className="break-words font-mono text-xs text-red-700 dark:text-red-300"
+            data-testid="mint-error-message"
+          >
             {failure.message}
           </p>
         </div>
       </div>
+
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
           onClick={onRetry}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
           Try Again
@@ -79,7 +87,7 @@ export function MintFailureNotice({
         <button
           type="button"
           onClick={onReset}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           Start Over
         </button>
@@ -88,11 +96,12 @@ export function MintFailureNotice({
   );
 }
 
-/**
- * Final confirmation + mint action. Owns the wallet/sign/submit sequence and
- * shows a recoverable error UI if any part of the mint transaction fails.
- */
-export default function ReadyToMint({ contentHash, manifestHash, isReady }: ReadyToMintProps) {
+/** Final confirmation and mint action for the verified payload. */
+export default function ReadyToMint({
+  contentHash,
+  manifestHash,
+  isReady,
+}: ReadyToMintProps) {
   const {
     isSubmitting,
     submissionResult,
@@ -117,34 +126,58 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
     setSubmissionError(null);
 
     try {
-      const walletConnected = await isConnected();
-      if (!walletConnected) {
+      const walletStatus = await isConnected();
+      const connected =
+        typeof walletStatus === 'boolean'
+          ? walletStatus
+          : Boolean((walletStatus as { isConnected?: boolean }).isConnected);
+
+      if (!connected) {
         throw new VerificationSubmissionError(
           'Wallet not connected. Please connect your Freighter wallet to continue.',
-          'unknown'
         );
       }
 
       const accessResponse = await requestAccess();
       if (accessResponse.error) {
-        throw new VerificationSubmissionError(`Freighter error: ${accessResponse.error}`, 'user_rejected');
+        const errorValue = accessResponse.error as unknown;
+        const errorMessage =
+          typeof errorValue === 'string'
+            ? errorValue
+            : typeof errorValue === 'object' && errorValue !== null && 'message' in errorValue
+              ? String((errorValue as { message?: unknown }).message ?? 'Request declined')
+              : 'Request declined';
+        throw new VerificationSubmissionError(
+          `Freighter error: ${errorMessage}`,
+          'user_rejected',
+        );
       }
 
       const activePublicKey = accessResponse.address;
       if (!activePublicKey) {
-        throw new VerificationSubmissionError('Unable to retrieve public key from Freighter wallet.', 'unknown');
+        throw new VerificationSubmissionError(
+          'Unable to retrieve public key from Freighter wallet.',
+        );
       }
 
       const result = await submitVerificationRequest(contentHash, manifestHash, activePublicKey);
       setSubmissionResult({ ...result, timestamp: new Date().toISOString() });
     } catch (error) {
-      setFailureKind(error instanceof VerificationSubmissionError ? error.kind : 'unknown');
+      const failure = error instanceof VerificationSubmissionError ? error : null;
+      setFailureKind(failure?.kind ?? 'unknown');
       setSubmissionError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       lockRef.current = false;
       setIsSubmitting(false);
     }
-  }, [canSubmit, contentHash, manifestHash, setIsSubmitting, setSubmissionResult, setSubmissionError]);
+  }, [
+    canSubmit,
+    contentHash,
+    manifestHash,
+    setIsSubmitting,
+    setSubmissionError,
+    setSubmissionResult,
+  ]);
 
   if (submissionError) {
     return (
@@ -160,16 +193,23 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
 
   return (
     <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Ready to mint</h3>
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+          Your verified data is ready to be recorded on the Stellar network.
+        </p>
+      </div>
+
       <label className="flex cursor-pointer items-start gap-3">
         <input
           type="checkbox"
           checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
+          onChange={(event) => setConfirmed(event.target.checked)}
           disabled={isSubmitting}
           className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 accent-blue-600"
         />
         <span className="text-xs leading-relaxed text-gray-700 dark:text-gray-300">
-          I confirm that the information above is correct and I authorise the submission to the Stellar network.
+          I confirm that the information above is correct and authorise minting this certificate on the Stellar network.
         </span>
       </label>
 
@@ -177,7 +217,8 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
         type="button"
         onClick={handleMint}
         disabled={!canSubmit}
-        className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+        aria-busy={isSubmitting}
+        className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
           canSubmit
             ? 'bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95'
             : 'cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800'
@@ -186,12 +227,12 @@ export default function ReadyToMint({ contentHash, manifestHash, isReady }: Read
         {isSubmitting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Submitting...
+            Minting certificate…
           </>
         ) : (
           <>
             <Send className="h-4 w-4" aria-hidden="true" />
-            Submit Record
+            Mint Certificate
           </>
         )}
       </button>

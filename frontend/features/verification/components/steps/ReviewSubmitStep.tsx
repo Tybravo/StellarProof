@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   Edit2,
@@ -11,6 +11,7 @@ import {
   Loader2,
   RotateCcw,
   ExternalLink,
+  Copy,
   Check,
   HardDrive,
   Lock,
@@ -18,7 +19,6 @@ import {
 } from 'lucide-react';
 import { useWizardStore, SubmissionResult } from '../../store/wizard.store';
 import { isValidSHA256 } from '@/utils/crypto';
-import CopyToClipboard from '@/components/ui/CopyToClipboard';
 import ReadyToMint from '../ReadyToMint';
 
 interface ReviewSubmitStepProps {
@@ -88,6 +88,18 @@ function OverlaySpinner() {
 }
 
 function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: () => void; }) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const handleCopy = useCallback(async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(field);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Clipboard API not available
+    }
+  }, []);
+
   return (
     <div className="w-full max-w-xl mx-auto space-y-6">
       <div className="flex flex-col items-center text-center space-y-4 py-6">
@@ -119,7 +131,13 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
               <p className="text-xs text-gray-500 dark:text-gray-400">Request ID</p>
               <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.requestId}</p>
             </div>
-            <CopyToClipboard value={result.requestId} label="request ID" className="ml-2" />
+            <button
+              type="button"
+              onClick={() => handleCopy(result.requestId, 'requestId')}
+              className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              {copied === 'requestId' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+            </button>
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
@@ -127,7 +145,13 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
               <p className="text-xs text-gray-500 dark:text-gray-400">Transaction Hash</p>
               <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.txHash}</p>
             </div>
-            <CopyToClipboard value={result.txHash} label="transaction hash" className="ml-2" />
+            <button
+              type="button"
+              onClick={() => handleCopy(result.txHash, 'txHash')}
+              className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              {copied === 'txHash' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+            </button>
           </div>
 
           {result.certificateId && (
@@ -136,7 +160,13 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
                 <p className="text-xs text-gray-500 dark:text-gray-400">Certificate ID</p>
                 <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{result.certificateId}</p>
               </div>
-            <CopyToClipboard value={result.certificateId} label="certificate ID" className="ml-2" />
+              <button
+                type="button"
+                onClick={() => handleCopy(result.certificateId!, 'certificateId')}
+                className="ml-2 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                {copied === 'certificateId' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+              </button>
             </div>
           )}
         </div>
@@ -169,11 +199,11 @@ function SuccessState({ result, onReset }: { result: SubmissionResult; onReset: 
 
 export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) {
   const { formData, isSubmitting, submissionResult, resetWizard } = useWizardStore();
-
   const content = formData.content;
   const isEncrypted = content?.encryptionEnabled ?? true;
   const contentHashValid = isValidSHA256(content?.contentHash ?? '');
   const hasManifest = content?.manifest !== null && content?.manifest !== undefined;
+  
   const file = content?.file;
 
   // Generate thumbnail URL for images with safe Blob check
@@ -236,14 +266,11 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 shadow-sm space-y-3">
           <SectionHeader icon={<FileJson className="w-4 h-4" />} title="Manifest Details" stepIndex={1} onNavigate={onNavigate} />
           {hasManifest && content?.manifestHash ? (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-xs text-gray-500">Hash</span>
-                <span className="text-xs font-mono text-gray-800 dark:text-gray-200 truncate" title={content.manifestHash}>
-                  {content.manifestHash}
-                </span>
-              </div>
-              <CopyToClipboard value={content.manifestHash} label="manifest hash" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-gray-500">Hash</span>
+              <span className="text-xs font-mono text-gray-800 dark:text-gray-200 truncate" title={content.manifestHash}>
+                {content.manifestHash}
+              </span>
             </div>
           ) : (
             <p className="text-xs text-gray-400 italic">No additional manifest metadata provided.</p>
@@ -277,11 +304,10 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
       <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 p-4 space-y-3">
         <SectionHeader icon={<Hash className="w-4 h-4" />} title="Content Hash Validation" />
         {contentHashValid ? (
-          <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
             <p className="text-xs font-mono break-all text-green-800 dark:text-green-200">
               {content?.contentHash}
             </p>
-            <CopyToClipboard value={content?.contentHash ?? ''} label="content hash" />
           </div>
         ) : (
           <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
@@ -296,8 +322,7 @@ export default function ReviewSubmitStep({ onNavigate }: ReviewSubmitStepProps) 
         isReady={contentHashValid}
       />
 
-      {isSubmitting && !showSignPrompt && <OverlaySpinner />}
-      <SignPromptModal open={showSignPrompt} onClose={() => setShowSignPrompt(false)} />
+      {isSubmitting && <OverlaySpinner />}
     </div>
   );
 }
