@@ -23,7 +23,9 @@ function WalletVault({ publicKey }: { publicKey?: string }) {
     let cancelled = false;
     fetchAssets(publicKey ?? undefined)
       .then((data) => {
-        if (!cancelled) setAssets(data.filter((asset) => asset.kmsEncryptionStatus === "encrypted"));
+        if (cancelled) return;
+        setError(null);
+        setAssets(data.filter((asset) => asset.kmsEncryptionStatus === "encrypted"));
       })
       .catch(() => {
         if (!cancelled) setError("Could not load sealed assets.");
