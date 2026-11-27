@@ -1,8 +1,12 @@
 'use client';
 
-// Replace the @/ import with this relative one to test visibility
 import WizardPageShell from '../../features/verification/components/WizardPageShell';
+import { WalletGuard } from '@/components/auth/WalletGuard';
 
 export default function Page() {
-  return <WizardPageShell />;
+  return (
+    <WalletGuard>
+      <WizardPageShell />
+    </WalletGuard>
+  );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { AlertCircle, Loader2, RotateCcw, Send } from 'lucide-react';
 import { isConnected, requestAccess } from '@stellar/freighter-api';
 import { useWizardStore } from '../store/wizard.store';
@@ -140,8 +140,15 @@ export default function ReadyToMint({
 
       const accessResponse = await requestAccess();
       if (accessResponse.error) {
+        const errorValue = accessResponse.error as unknown;
+        const errorMessage =
+          typeof errorValue === 'string'
+            ? errorValue
+            : typeof errorValue === 'object' && errorValue !== null && 'message' in errorValue
+              ? String((errorValue as { message?: unknown }).message ?? 'Request declined')
+              : 'Request declined';
         throw new VerificationSubmissionError(
-          `Freighter error: ${accessResponse.error}`,
+          `Freighter error: ${errorMessage}`,
           'user_rejected',
         );
       }
