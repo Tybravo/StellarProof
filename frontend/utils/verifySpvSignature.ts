@@ -4,12 +4,16 @@ export interface VerifySpvSignatureInput {
   publicKeyHex: string;
 }
 
-function decodeHex(value: string, byteLength: number, label: string): Uint8Array {
+// Web Crypto's current TypeScript declarations require an ArrayBuffer-backed
+// view, while a normal Uint8Array is typed as potentially ArrayBufferLike.
+// The bytes produced here are owned by this function, so this narrowing is
+// safe and keeps the crypto boundary explicit.
+function decodeHex(value: string, byteLength: number, label: string): Uint8Array<ArrayBuffer> {
   const normalized = value.trim().replace(/^0x/i, '');
   if (!new RegExp(`^[0-9a-fA-F]{${byteLength * 2}}$`).test(normalized)) {
     throw new Error(`${label} must contain exactly ${byteLength} bytes of hexadecimal data.`);
   }
-  return Uint8Array.from(normalized.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16));
+  return Uint8Array.from(normalized.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16)) as Uint8Array<ArrayBuffer>;
 }
 
 export async function verifySpvSignature(input: VerifySpvSignatureInput): Promise<boolean> {

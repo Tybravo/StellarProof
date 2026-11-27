@@ -72,7 +72,7 @@ export function useSignTransaction(
       setError(null);
 
       try {
-        const result = await requestSignature(transaction.toXDR(), {
+        const result = await signWithFreighter(transaction.toXDR(), {
           address,
           networkPassphrase,
         });

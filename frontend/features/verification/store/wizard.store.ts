@@ -21,6 +21,8 @@ export interface SubmissionResult {
 /** Lifecycle of the verification application as tracked by the wizard. */
 export type ApplicationStatus = 'Draft' | 'Minting' | 'Minted';
 
+export type VerificationStage = 'Idle' | 'Requested' | 'Processing' | 'Attested' | 'Minted' | 'Failed';
+
 export interface MintedCertificate {
   certificateId: string;
   txHash: string;
