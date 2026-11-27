@@ -1,5 +1,5 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { signWithFreighter, transactionErrorMessage } from '@/hooks/useSignTransaction';
+import { signWithFreighter } from '@/hooks/useSignTransaction';
 import { walletService } from './wallet';
 
 export interface SubmissionResult {
@@ -83,25 +83,14 @@ export const submitVerificationRequest = async (
       .build();
 
     let signedXDR: string;
-    if (typeof signedResult === 'string') {
-      signedXDR = signedResult;
-    } else if (signedResult && typeof signedResult === 'object') {
-      // Handle the case where signedResult is an object with signedTxXdr
-      const resultObj = signedResult as {
-        signedTxXdr?: string;
-        signedTransaction?: string;
-        error?: { message?: string } | string;
-      };
-      if (resultObj.error) {
-        const detail = typeof resultObj.error === 'string' ? resultObj.error : resultObj.error.message;
-        throw new Error(detail || 'Freighter failed to sign the transaction');
-      }
-      signedXDR = resultObj.signedTxXdr || resultObj.signedTransaction || '';
-      if (!signedXDR) {
-        throw new Error('No signed transaction XDR returned from Freighter');
-      }
-    } else {
-      throw new Error('Invalid response from Freighter signing');
+    onSigningChange?.(true);
+    try {
+      signedXDR = await signWithFreighter(transaction.toXDR(), {
+        address: publicKey,
+        networkPassphrase,
+      });
+    } finally {
+      onSigningChange?.(false);
     }
 
     // Submit the transaction
